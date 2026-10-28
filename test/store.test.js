@@ -47,12 +47,34 @@ test('sweep removes old trash rows and files, purges, and clears stale tmp', asy
   await utimes(stale, old, old);
   const purged = [];
   const r = await sweep({ db, root, now: new Date('2026-02-05T00:00:00.000Z'), trashDays: 30, purge: async (id, ext) => purged.push(`${id}.${ext}`) });
-  assert.deepEqual(r, { removed: 1, tmpRemoved: 1 });
+  assert.deepEqual(r, { removed: 1, tmpRemoved: 1, failed: [] });
   assert.equal(getFile(db, 'old0000000000'), null);
   assert.equal(getFile(db, 'new0000000000').deleted_at, '2026-01-20T00:00:00.000Z');
   await assert.rejects(stat(trashPath(root, 'old0000000000', 'txt')));
   await stat(trashPath(root, 'new0000000000', 'txt'));
   assert.deepEqual(purged, ['old0000000000.txt']);
   assert.deepEqual(await readdir(tmpDir(root)), ['fresh']);
+  await cleanup();
+});
+
+test('sweep never removes a row that was restored after it was listed', async () => {
+  const { root, db, cleanup } = await makeRoot();
+  const a = createAccount(db, 'juan');
+  insertFile(db, row('res0000000000', a.id));
+  await writeFile(trashPath(root, 'res0000000000', 'txt'), 'x');
+  markDeleted(db, 'res0000000000', '2026-01-02T00:00:00.000Z'); // trashed after old, so the sweep lists old first
+  // a restore that lands between the sweep's listing and its claim: simulate it inside purge of an earlier row
+  insertFile(db, row('old0000000000', a.id));
+  await writeFile(trashPath(root, 'old0000000000', 'txt'), 'x');
+  markDeleted(db, 'old0000000000', '2026-01-01T00:00:00.000Z');
+  const { markRestored } = await import('../server/repo.js');
+  const { restoreFromTrash } = await import('../server/store.js');
+  const r = await sweep({ db, root, now: new Date('2026-03-01T00:00:00.000Z'), trashDays: 30, purge: async id => {
+    if (id === 'old0000000000') { assert.equal(markRestored(db, 'res0000000000'), true); await restoreFromTrash(root, 'res0000000000', 'txt'); }
+  } });
+  assert.equal(r.removed, 1);
+  assert.equal(getFile(db, 'res0000000000').deleted_at, null, 'the restored row survives');
+  await stat(filePath(root, 'res0000000000', 'txt'));
+  assert.equal(getFile(db, 'old0000000000'), null);
   await cleanup();
 });

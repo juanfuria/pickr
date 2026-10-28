@@ -66,8 +66,14 @@ export function listFiles(db, accountId, { kind = null, since = null, before = n
 export function markDeleted(db, id, at = now()) {
   db.prepare('UPDATE files SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL').run(at, id);
 }
+// Restore claims the row: only a trashed row flips back, and the caller learns whether it won (the sweep may have
+// claimed the same row first from another process).
 export function markRestored(db, id) {
-  db.prepare('UPDATE files SET deleted_at = NULL WHERE id = ?').run(id);
+  return db.prepare('UPDATE files SET deleted_at = NULL WHERE id = ? AND deleted_at IS NOT NULL').run(id).changes === 1;
+}
+// The sweep claims a row the same way: one conditional delete, true only if the row was still trashed and old enough.
+export function claimTrashed(db, id, cutoffIso) {
+  return db.prepare('DELETE FROM files WHERE id = ? AND deleted_at IS NOT NULL AND deleted_at < ?').run(id, cutoffIso).changes === 1;
 }
 export function deleteFileRow(db, id) {
   db.prepare('DELETE FROM files WHERE id = ?').run(id);

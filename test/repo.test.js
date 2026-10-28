@@ -65,8 +65,10 @@ test('files: insert, get, live, sha lookup, list order and filters, delete/resto
   assert.equal(repo.findLiveBySha(db, a.id, 'a'.repeat(64)), null);
   assert.deepEqual(repo.trashedBefore(db, '2026-05-01T00:00:00.000Z').map(r => r.id), ['f1aaaaaaaaaa']);
   assert.deepEqual(repo.trashedBefore(db, '2026-03-01T00:00:00.000Z'), []);
-  repo.markRestored(db, 'f1aaaaaaaaaa');
+  assert.equal(repo.markRestored(db, 'f1aaaaaaaaaa'), true);
   assert.equal(repo.getLiveFile(db, 'f1aaaaaaaaaa').deleted_at, null);
+  assert.equal(repo.markRestored(db, 'f1aaaaaaaaaa'), false, 'a live row cannot be restored twice');
+  assert.equal(repo.claimTrashed(db, 'f1aaaaaaaaaa', '2099-01-01T00:00:00.000Z'), false, 'a live row is never claimed by the sweep');
 
   repo.updateName(db, 'f1aaaaaaaaaa', 'renamed.jpg');
   assert.equal(repo.getFile(db, 'f1aaaaaaaaaa').original_name, 'renamed.jpg');

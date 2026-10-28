@@ -1,7 +1,7 @@
 import { mkdir, rename, unlink, readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { trashedBefore, deleteFileRow } from './repo.js';
+import { trashedBefore, claimTrashed } from './repo.js';
 
 export const filePath = (root, id, ext) => join(root, 'files', `${id}.${ext}`);
 export const trashPath = (root, id, ext) => join(root, 'trash', `${id}.${ext}`);
@@ -25,9 +25,16 @@ const DAY = 86_400_000;
 export async function sweep({ db, root, now = new Date(), trashDays = 30, purge = async () => {} }) {
   const cutoff = new Date(now.getTime() - trashDays * DAY).toISOString();
   let removed = 0;
+  const failed = [];
   for (const r of trashedBefore(db, cutoff)) {
-    await unlink(trashPath(root, r.id, r.ext)).catch(() => {});
-    deleteFileRow(db, r.id);
+    // Claim the row before any await: a restore running in the server process claims the same row the same way,
+    // so exactly one of them wins and a restored file never loses its row.
+    if (!claimTrashed(db, r.id, cutoff)) continue;
+    try {
+      await unlink(trashPath(root, r.id, r.ext));
+    } catch (e) {
+      if (e.code !== 'ENOENT') failed.push({ id: r.id, error: e.code ?? String(e) });
+    }
     await purge(r.id, r.ext);
     removed++;
   }
@@ -40,5 +47,5 @@ export async function sweep({ db, root, now = new Date(), trashDays = 30, purge 
       tmpRemoved++;
     }
   }
-  return { removed, tmpRemoved };
+  return { removed, tmpRemoved, failed };
 }
