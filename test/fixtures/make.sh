@@ -24,6 +24,8 @@ ffmpeg -y -v error -f lavfi -i testsrc=size=320x240:rate=10 -f lavfi -i sine=fre
   clip.mp4
 
 ffmpeg -y -v error -f lavfi -i color=c=red:s=16x16 -frames:v 1 bitmap.bmp
+# the same clip with photo.jpg (GPS, camera) attached as cover art: a video strip must drop the picture, not copy it
+ffmpeg -y -v error -i clip.mp4 -i photo.jpg -map 0 -map 1 -c copy -disposition:v:1 attached_pic cover.mp4
 
 head -c 2000 photo.jpg > corrupt.jpg
 : > empty.bin

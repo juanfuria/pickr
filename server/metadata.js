@@ -61,10 +61,11 @@ export async function stripImage(path) {
   await run('exiftool', ['-all=', '-tagsfromfile', '@', '-ICC_Profile', '-Orientation', '-overwrite_original', '-q', '-api', 'largefilesupport=1', path], BIG);
 }
 
-// Lossless: streams are copied, container and stream metadata and chapters dropped. Video and audio only, so
-// phone "mebx" data tracks (motion metadata) go too.
+// Lossless: streams are copied, container and stream metadata and chapters dropped. Real video and audio only, so
+// phone "mebx" data tracks (motion metadata) and attached cover pictures (which carry their own EXIF) go too.
 export async function stripVideo(path) {
   const out = `${path}.strip${extname(path)}`;
-  await run('ffmpeg', ['-y', '-v', 'error', '-i', path, '-map', '0:v', '-map', '0:a?', '-map_metadata', '-1', '-map_chapters', '-1', '-c', 'copy', '-movflags', '+faststart', out], BIG);
+  // 0:V (capital) selects real video streams only: attached pictures (cover art) are JPEGs with their own EXIF and must not be copied.
+  await run('ffmpeg', ['-y', '-v', 'error', '-i', path, '-map', '0:V', '-map', '0:a?', '-map_metadata', '-1', '-map_chapters', '-1', '-c', 'copy', '-movflags', '+faststart', out], BIG);
   await rename(out, path);
 }

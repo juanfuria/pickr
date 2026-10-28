@@ -8,6 +8,14 @@ import { fixture, exif } from './helpers.js';
 import { readMeta, kindFromMime, takenAtFrom, stripImage, stripVideo } from '../server/metadata.js';
 import { measureVideo } from '../server/measure.js';
 
+// Tag names, in any exiftool group, that must never survive a strip, minus two structural survivors that match the
+// pattern but carry nothing personal: the colour profile's header constant (we keep the ICC profile on purpose) and the
+// mandatory MP4 header dates, which ffmpeg can only zero, never remove.
+const PERSONAL = /GPS|Location|Make$|Model$|Serial|Artist|Owner|DateTimeOriginal|CreateDate|Software/i;
+const STRUCTURAL = new Set(['ICC_Profile:DeviceModel']);
+const ZEROED = /^QuickTime:(Track|Media)?CreateDate$/;
+const personal = m => Object.keys(m).filter(k => PERSONAL.test(k) && !STRUCTURAL.has(k) && !(ZEROED.test(k) && m[k] === '0000:00:00 00:00:00'));
+
 async function scratch(name) {
   const dir = await mkdtemp(join(tmpdir(), 'pickr-meta-'));
   const p = join(dir, name);
@@ -63,6 +71,7 @@ test('stripImage removes everything but ICC and orientation and keeps pixels byt
   assert.equal(m['EXIF:Make'], undefined);
   assert.equal(m['EXIF:DateTimeOriginal'], undefined);
   assert.equal(m['EXIF:Artist'], undefined);
+  assert.deepEqual(personal(m), [], 'no personal tag in any group');
   assert.equal(m['EXIF:Orientation'], 6);
   assert.match(String(m['ICC_Profile:ProfileDescription'] ?? ''), /P3/i);
   const after = await sharp(p).raw().toBuffer();
@@ -77,6 +86,7 @@ test('stripImage works on png and heic, rejects bmp', async () => {
     const m = await exif(p);
     assert.equal(m['EXIF:GPSLatitude'], undefined, n);
     assert.equal(m['EXIF:Make'], undefined, n);
+    assert.deepEqual(personal(m), [], `${n}: no personal tag in any group`);
     await done();
   }
   const { p, done } = await scratch('bitmap.bmp');
@@ -90,9 +100,29 @@ test('stripVideo drops container metadata and keeps streams and duration', async
   await stripVideo(p);
   const m = await exif(p);
   assert.equal(m['QuickTime:Title'], undefined);
-  assert.equal(Object.keys(m).some(k => /GPS|Location/i.test(k)), false);
+  assert.deepEqual(personal(m), []);
   const after = await measureVideo(p);
   assert.equal(after.width, 320);
   assert.ok(Math.abs(after.duration - before.duration) < 0.2);
   await done();
 });
+
+test('stripVideo drops attached cover art, which carries its own EXIF', async () => {
+  const { p, done } = await scratch('cover.mp4');
+  const streamsBefore = await ffprobeStreams(p);
+  assert.ok(streamsBefore.some(s => s.disposition?.attached_pic === 1), 'fixture has an attached picture');
+  await stripVideo(p);
+  const streams = await ffprobeStreams(p);
+  assert.equal(streams.filter(s => s.codec_type === 'video').length, 1);
+  assert.equal(streams.some(s => s.disposition?.attached_pic === 1), false, 'no attached picture after the strip');
+  const m = await exif(p);
+  assert.deepEqual(personal(m), []);
+  await done();
+});
+
+async function ffprobeStreams(path) {
+  const { execFile } = await import('node:child_process');
+  const { promisify } = await import('node:util');
+  const { stdout } = await promisify(execFile)('ffprobe', ['-v', 'error', '-print_format', 'json', '-show_streams', path]);
+  return JSON.parse(stdout).streams ?? [];
+}

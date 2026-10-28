@@ -6,7 +6,7 @@ import { promisify } from 'node:util';
 import { fixture } from './helpers.js';
 
 const run = promisify(execFile);
-const NAMES = ['photo.jpg', 'photo.heic', 'alpha.png', 'big.jpg', 'animated.gif', 'clip.mp4', 'corrupt.jpg', 'empty.bin', 'scripted.svg', 'doc.pdf', 'bitmap.bmp'];
+const NAMES = ['photo.jpg', 'photo.heic', 'alpha.png', 'big.jpg', 'animated.gif', 'clip.mp4', 'cover.mp4', 'corrupt.jpg', 'empty.bin', 'scripted.svg', 'doc.pdf', 'bitmap.bmp'];
 
 test('every fixture exists', async () => {
   for (const n of NAMES) await stat(fixture(n));
