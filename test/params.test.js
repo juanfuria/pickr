@@ -16,6 +16,8 @@ test('values are parsed, clamped and normalised', () => {
   assert.equal(parseImageParams({ q: '0' }).q, 1);
   assert.equal(parseImageParams({ fit: 'stretch' }).fit, 'inside');
   assert.equal(parseImageParams({ fm: 'bmp' }).fm, null);
+  assert.equal(parseImageParams({ fm: 'constructor' }).fm, null, 'inherited names are not formats');
+  assert.equal(parseImageParams({ fm: '__proto__' }).active, false);
   assert.equal(parseImageParams({ up: 'yes' }).up, false);
 });
 

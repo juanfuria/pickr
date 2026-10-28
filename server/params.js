@@ -13,7 +13,8 @@ export function parseImageParams(query = {}) {
   const w = int(query.w, 1, MAX_EDGE);
   const h = int(query.h, 1, MAX_EDGE);
   const fit = FITS.has(query.fit) ? query.fit : 'inside';
-  const fm = FORMATS[String(query.fm ?? '').toLowerCase()] ?? null;
+  const fmKey = String(query.fm ?? '').toLowerCase();
+  const fm = Object.hasOwn(FORMATS, fmKey) ? FORMATS[fmKey] : null;
   const q = int(query.q, 1, 100) ?? 80;
   const dpr = int(query.dpr, 1, 3) ?? 1;
   const up = query.up === '1';
