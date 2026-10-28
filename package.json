@@ -1,0 +1,19 @@
+{
+  "name": "pickr",
+  "version": "0.1.0",
+  "private": true,
+  "description": "imgix-style file host for i.juan.is",
+  "type": "module",
+  "engines": { "node": ">=22.13" },
+  "bin": { "pickr": "bin/pickr.js", "pickr-admin": "bin/pickr-admin.js" },
+  "scripts": {
+    "start": "node --no-warnings=ExperimentalWarning server/index.js",
+    "test": "node --test --no-warnings=ExperimentalWarning 'test/**/*.test.js'",
+    "fixtures": "bash test/fixtures/make.sh"
+  },
+  "dependencies": {
+    "@fastify/multipart": "^9.0.3",
+    "fastify": "^5.3.0",
+    "sharp": "^0.34.2"
+  }
+}
