@@ -24,6 +24,12 @@ test('width, height, fit, dpr, no upscaling, up=1, cap', async () => {
   assert.deepEqual((await dims(capped.body)).slice(0, 2), [4096, 2458]);
   const edge = await renderImage(fixture('big.jpg'), P({ w: '4096', h: '4096', up: '1' }));
   assert.deepEqual((await dims(edge.body)).slice(0, 2), [4096, 2458]);
+  // a thin image upscaled on one axis must not explode the other: 10x100 asked for w=4096&dpr=3&up=1
+  const thin = await sharp({ create: { width: 10, height: 100, channels: 3, background: '#000' } }).png().toBuffer();
+  const tall = await renderImage(thin, P({ w: '4096', dpr: '3', up: '1' }));
+  const [tw, th] = await dims(tall.body);
+  assert.ok(tw <= 4096 && th <= 4096, `bounded on both sides, got ${tw}x${th}`);
+  assert.equal(th, 4096);
 });
 
 test('formats, quality and mime', async () => {
@@ -64,6 +70,26 @@ test('derivatives carry no metadata', async () => {
 test('unreadable input rejects', async () => {
   await assert.rejects(renderImage(fixture('corrupt.jpg'), P({ w: '10' })));
   await assert.rejects(renderImage(fixture('doc.pdf'), P({ w: '10' })));
+});
+
+test('a multi-page TIFF rasterises its first page, not a strip of all pages', async () => {
+  const page = () => sharp({ create: { width: 120, height: 90, channels: 3, background: '#357' } });
+  const pages = await Promise.all([page().png().toBuffer(), page().png().toBuffer(), page().png().toBuffer()]);
+  const tiff = await sharp(pages, { join: { animated: true } }).tiff().toBuffer();
+  const out = await renderImage(tiff, P({ w: '60' }));
+  assert.equal(out.mime, 'image/png');
+  assert.deepEqual((await dims(out.body)).slice(0, 2), [60, 45]);
+});
+
+test('posterFrame surfaces a missing ffmpeg rather than reporting "no frame"', async () => {
+  const { posterFrame: pf } = await import('../server/render.js');
+  const saved = process.env.PATH;
+  process.env.PATH = '/nonexistent';
+  try {
+    await assert.rejects(pf(fixture('clip.mp4'), 0), e => e.code === 'ENOENT');
+  } finally {
+    process.env.PATH = saved;
+  }
 });
 
 test('poster frames from video, composable with image params', async () => {
