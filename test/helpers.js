@@ -2,9 +2,12 @@ import { mkdtemp, rm, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { openDb } from '../server/db.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
+const run = promisify(execFile);
 
 export async function makeRoot() {
   const root = await mkdtemp(join(tmpdir(), 'pickr-test-'));
@@ -15,4 +18,9 @@ export async function makeRoot() {
 
 export function fixture(name) {
   return join(here, 'fixtures', name);
+}
+
+export async function exif(path) {
+  const { stdout } = await run('exiftool', ['-json', '-G', '-n', path]);
+  return JSON.parse(stdout)[0];
 }
