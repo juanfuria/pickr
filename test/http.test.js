@@ -17,6 +17,9 @@ test('contentDisposition survives hostile names', () => {
   assert.doesNotMatch(v, /[\r\n"]{2}|\r|\n/);
   assert.match(v, /^attachment; filename="a_b__X-Evil: 1\.pdf"; filename\*=UTF-8''a_b__X-Evil%3A%201\.pdf$/);
   assert.equal(contentDisposition('año.png'), `attachment; filename="a_o.png"; filename*=UTF-8''a%C3%B1o.png`);
+  assert.equal(contentDisposition("o'hara (1)*.jpg"), `attachment; filename="o'hara (1)*.jpg"; filename*=UTF-8''o%27hara%20%281%29%2A.jpg`);
+  assert.match(contentDisposition('bad\ud800name.txt'), /filename\*=UTF-8''bad%EF%BF%BDname\.txt$/, 'a lone surrogate never throws');
+  assert.doesNotThrow(() => contentDisposition('x'.repeat(199) + '😀' + 'y'.repeat(10)), 'the cut never splits a surrogate pair');
   assert.equal(contentDisposition(''), `attachment; filename="file"; filename*=UTF-8''file`);
   assert.equal(contentDisposition(null), `attachment; filename="file"; filename*=UTF-8''file`);
   assert.ok(contentDisposition('x'.repeat(500)).length < 450);
