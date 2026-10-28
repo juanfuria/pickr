@@ -5,6 +5,9 @@ import { fileURLToPath } from 'node:url';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { openDb } from '../server/db.js';
+import { buildApp } from '../server/app.js';
+import { createAccount, insertKey } from '../server/repo.js';
+import { generateKey } from '../server/auth.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const run = promisify(execFile);
@@ -23,4 +26,21 @@ export function fixture(name) {
 export async function exif(path) {
   const { stdout } = await run('exiftool', ['-json', '-G', '-n', path]);
   return JSON.parse(stdout)[0];
+}
+
+export function multipart(fieldName, filename, bytes, mime = 'application/octet-stream') {
+  const boundary = '----pickr' + Math.random().toString(16).slice(2);
+  const head = Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="${fieldName}"; filename="${filename}"\r\nContent-Type: ${mime}\r\n\r\n`);
+  const tail = Buffer.from(`\r\n--${boundary}--\r\n`);
+  return { headers: { 'content-type': `multipart/form-data; boundary=${boundary}` }, payload: Buffer.concat([head, bytes, tail]) };
+}
+
+export async function makeApp(opts = {}) {
+  const { root, db, cleanup: cleanRoot } = await makeRoot();
+  const account = createAccount(db, 'juan');
+  const { key, hash } = generateKey();
+  insertKey(db, { accountId: account.id, keyHash: hash, label: 'test' });
+  const purged = [];
+  const app = await buildApp({ db, root, publicUrl: 'https://i.test', purgeUrl: 'http://purge.invalid', purge: async (id, ext) => { purged.push(`${id}.${ext}`); return true; }, ...opts });
+  return { app, db, root, key, account, purged, cleanup: async () => { await app.close(); await cleanRoot(); } };
 }
