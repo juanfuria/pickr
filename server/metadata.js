@@ -8,7 +8,14 @@ const BIG = { maxBuffer: 64 * 1024 * 1024 };
 const DROP = new Set(['SourceFile', 'File:FileName', 'File:Directory', 'File:FilePermissions', 'File:FileModifyDate', 'File:FileAccessDate', 'File:FileInodeChangeDate']);
 
 export async function readMeta(path) {
-  const { stdout } = await run('exiftool', ['-json', '-G', '-n', '-api', 'largefilesupport=1', path], BIG);
+  let stdout;
+  try {
+    ({ stdout } = await run('exiftool', ['-json', '-G', '-n', '-api', 'largefilesupport=1', path], BIG));
+  } catch (e) {
+    // exiftool exits 1 on a file it does not recognise but still prints its JSON; bytes it cannot name are still a file.
+    if (/Unknown file type/.test(String(e.stdout ?? ''))) return { meta: {}, mime: 'application/octet-stream', ext: null, takenAt: null };
+    throw e;
+  }
   const raw = JSON.parse(stdout)[0] ?? {};
   if (raw['ExifTool:Error']) throw new Error(String(raw['ExifTool:Error']));
   const meta = {};
@@ -63,8 +70,9 @@ export async function stripImage(path) {
 
 // Lossless: streams are copied, container and stream metadata and chapters dropped. Real video and audio only, so
 // phone "mebx" data tracks (motion metadata) and attached cover pictures (which carry their own EXIF) go too.
-export async function stripVideo(path) {
-  const out = `${path}.strip${extname(path)}`;
+// ffmpeg picks the muxer from the output name, so the caller passes the detected extension (temp files have none).
+export async function stripVideo(path, ext = extname(path).slice(1)) {
+  const out = `${path}.strip.${ext}`;
   // 0:V (capital) selects real video streams only: attached pictures (cover art) are JPEGs with their own EXIF and must not be copied.
   await run('ffmpeg', ['-y', '-v', 'error', '-i', path, '-map', '0:V', '-map', '0:a?', '-map_metadata', '-1', '-map_chapters', '-1', '-c', 'copy', '-movflags', '+faststart', out], BIG);
   await rename(out, path);

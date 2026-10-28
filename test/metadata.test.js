@@ -46,8 +46,13 @@ test('readMeta: video, pdf, svg, heic, bmp', async () => {
   assert.equal((await readMeta(fixture('bitmap.bmp'))).mime, 'image/bmp');
 });
 
-test('readMeta rejects an empty file', async () => {
+test('readMeta rejects an empty file but names unknown bytes a plain file', async () => {
   await assert.rejects(readMeta(fixture('empty.bin')));
+  const dir = await mkdtemp(join(tmpdir(), 'pickr-meta-'));
+  const p = join(dir, 'blob');
+  await (await import('node:fs/promises')).writeFile(p, Buffer.from([1, 2, 3, 4, 5, 6, 7, 8]));
+  assert.deepEqual(await readMeta(p), { meta: {}, mime: 'application/octet-stream', ext: null, takenAt: null });
+  await rm(dir, { recursive: true, force: true });
 });
 
 test('kindFromMime and takenAtFrom', () => {
