@@ -23,6 +23,18 @@ test('authentication is required on /api and errors are json', async () => {
   await cleanup();
 });
 
+test('a percent-encoded /api path still needs a key and writes nothing', async () => {
+  const { app, root, cleanup } = await makeApp();
+  for (const url of ['/%61pi/files', '/ap%69/me', '/%61pi/keys']) {
+    assert.equal((await app.inject({ method: 'GET', url })).statusCode, 401, url);
+  }
+  const mp = multipart('file', 'x.bin', Buffer.alloc(4096, 1));
+  const r = await app.inject({ method: 'POST', url: '/%61pi/files', headers: mp.headers, payload: mp.payload });
+  assert.equal(r.statusCode, 401);
+  assert.deepEqual(await readdir(`${root}/tmp`), []);
+  await cleanup();
+});
+
 test('upload, dedupe, get with meta, list, patch', async () => {
   const { app, key, root, cleanup } = await makeApp();
   const r = await upload(app, key, 'photo.jpg');

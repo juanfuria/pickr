@@ -11,7 +11,9 @@ export async function buildApp({ db, root, publicUrl, purgeUrl, purge = null, lo
   app.decorateRequest('account', null);
 
   app.addHook('onRequest', async (req, reply) => {
-    if (!req.url.startsWith('/api/')) return;
+    // The router decodes percent-escapes before matching (/%61pi/files reaches /api/files), so the raw URL alone would
+    // let an encoded path skip this check: the matched route decides as well.
+    if (!req.url.startsWith('/api/') && !req.routeOptions.url?.startsWith('/api/')) return;
     const a = authenticate(db, req.headers.authorization);
     if (!a) return reply.code(401).send({ error: 'missing or invalid key' });
     req.account = a;
