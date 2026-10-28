@@ -2,7 +2,6 @@ import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { chmod, rename, stat, unlink } from 'node:fs/promises';
 import { pipeline } from 'node:stream/promises';
-import { extname } from 'node:path';
 import { readMeta, kindFromMime, stripImage, stripVideo } from './metadata.js';
 import { measureImage, measureVideo } from './measure.js';
 import { newId, isValidId } from './ids.js';
@@ -17,26 +16,23 @@ export async function sha256File(path) {
   return h.digest('hex');
 }
 
-function extFromName(name) {
-  const e = extname(String(name ?? '')).slice(1).toLowerCase();
-  return /^[a-z0-9]{1,8}$/.test(e) ? e : null;
-}
-
 export async function ingest({ db, root, tmpPath, accountId, originalName = null, id = null, createdAt = null, dedupe = true }) {
   try {
     if (id !== null && !isValidId(id)) throw httpError(400, 'invalid id');
     if ((await stat(tmpPath)).size === 0) throw httpError(422, 'empty file');
 
     let info;
-    try { info = await readMeta(tmpPath); } catch (e) { throw httpError(422, `unreadable file: ${e.message}`); }
+    try { info = await readMeta(tmpPath); } catch (e) { throw failed('unreadable file', e, tmpPath); }
     const kind = kindFromMime(info.mime);
-    const ext = info.ext ?? extFromName(originalName) ?? 'bin';
+    // The extension is exiftool's verdict or 'bin': never the uploader's name, which nginx would otherwise turn into a
+    // content type (an unknown blob called x.html must not be served as text/html).
+    const ext = info.ext ?? 'bin';
 
     if (kind === 'image' && info.mime !== 'image/svg+xml') {
-      try { await stripImage(tmpPath); } catch (e) { throw httpError(422, `cannot strip metadata from this image: ${firstLine(e)}`); }
+      try { await stripImage(tmpPath); } catch (e) { throw failed('cannot strip metadata from this image', e, tmpPath); }
     }
     if (kind === 'video') {
-      try { await stripVideo(tmpPath, ext); } catch (e) { throw httpError(422, `cannot strip metadata from this video: ${firstLine(e)}`); }
+      try { await stripVideo(tmpPath, ext); } catch (e) { throw failed('cannot strip metadata from this video', e, tmpPath); }
     }
 
     const sha256 = await sha256File(tmpPath);
@@ -74,5 +70,13 @@ export async function ingest({ db, root, tmpPath, accountId, originalName = null
   }
 }
 
-const firstLine = e => String(e?.stderr || e?.message || e).split('\n')[0].slice(0, 200);
+// The client gets a fixed message; the tool's own line travels on err.detail for the server log, with the temp path
+// blanked and warnings skipped in favour of the first "Error" line.
+function failed(message, e, path) {
+  const lines = String(e?.stderr || e?.message || e).split('\n').map(l => l.trim()).filter(Boolean);
+  const line = lines.find(l => /^Error/i.test(l)) ?? lines[lines.length - 1] ?? '';
+  const err = httpError(422, message);
+  err.detail = line.split(path).join('<file>').slice(0, 200);
+  return err;
+}
 const numberOrNull = v => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : null);

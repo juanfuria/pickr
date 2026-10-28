@@ -101,6 +101,12 @@ test('an image that cannot be stripped, an empty file and a corrupt image fail w
   for (const n of ['bitmap.bmp', 'empty.bin']) {
     await assert.rejects(ingest({ db, root, tmpPath: await staged(root, n), accountId: a.id }), e => e.status === 422);
   }
+  await assert.rejects(ingest({ db, root, tmpPath: await staged(root, 'bitmap.bmp'), accountId: a.id }), e => {
+    assert.equal(e.message, 'cannot strip metadata from this image', 'a fixed client message');
+    assert.match(e.detail, /not supported/i, 'the tool error travels on detail');
+    assert.doesNotMatch(e.detail, new RegExp(root.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), 'no server path in detail');
+    return true;
+  });
   // corrupt.jpg: exiftool may still read its header (stored as an image, rendering fails later) or refuse it (422).
   // Both are acceptable; what matters is that nothing is left behind either way.
   let stored = 0;

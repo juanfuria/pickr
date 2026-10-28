@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { rename } from 'node:fs/promises';
+import { rename, rm } from 'node:fs/promises';
 import { extname } from 'node:path';
 
 const run = promisify(execFile);
@@ -73,7 +73,12 @@ export async function stripImage(path) {
 // ffmpeg picks the muxer from the output name, so the caller passes the detected extension (temp files have none).
 export async function stripVideo(path, ext = extname(path).slice(1)) {
   const out = `${path}.strip.${ext}`;
-  // 0:V (capital) selects real video streams only: attached pictures (cover art) are JPEGs with their own EXIF and must not be copied.
-  await run('ffmpeg', ['-y', '-v', 'error', '-i', path, '-map', '0:V', '-map', '0:a?', '-map_metadata', '-1', '-map_chapters', '-1', '-c', 'copy', '-movflags', '+faststart', out], BIG);
-  await rename(out, path);
+  try {
+    // 0:V (capital) selects real video streams only: attached pictures (cover art) are JPEGs with their own EXIF and must not be copied.
+    await run('ffmpeg', ['-y', '-v', 'error', '-i', path, '-map', '0:V', '-map', '0:a?', '-map_metadata', '-1', '-map_chapters', '-1', '-c', 'copy', '-movflags', '+faststart', out], BIG);
+    await rename(out, path);
+  } catch (e) {
+    await rm(out, { force: true }); // ffmpeg creates the output before it can fail at the header; never leave it behind
+    throw e;
+  }
 }

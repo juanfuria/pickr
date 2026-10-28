@@ -1,10 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { copyFile, mkdtemp, rm, readFile } from 'node:fs/promises';
+import { copyFile, mkdtemp, rm, readFile, readdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import sharp from 'sharp';
 import { fixture, exif } from './helpers.js';
+
+const run = promisify(execFile);
 import { readMeta, kindFromMime, takenAtFrom, stripImage, stripVideo } from '../server/metadata.js';
 import { measureVideo } from '../server/measure.js';
 
@@ -110,6 +114,19 @@ test('stripVideo drops container metadata and keeps streams and duration', async
   assert.equal(after.width, 320);
   assert.ok(Math.abs(after.duration - before.duration) < 0.2);
   await done();
+});
+
+test('stripVideo leaves nothing behind when ffmpeg cannot write the container', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'pickr-meta-'));
+  const p = join(dir, 'clip');
+  // msvideo1 cannot be copied into an MP4 container: ffmpeg creates the output, then fails writing the header
+  await run('ffmpeg', ['-y', '-v', 'error', '-f', 'lavfi', '-i', 'testsrc=size=64x48:rate=5', '-t', '1', '-c:v', 'msvideo1', `${p}.avi`]);
+  await (await import('node:fs/promises')).rename(`${p}.avi`, p);
+  const before = await readFile(p);
+  await assert.rejects(stripVideo(p, 'mp4'));
+  assert.deepEqual((await readdir(dir)), ['clip'], 'no .strip output left next to the source');
+  assert.ok(before.equals(await readFile(p)), 'the source is untouched');
+  await rm(dir, { recursive: true, force: true });
 });
 
 test('stripVideo drops attached cover art, which carries its own EXIF', async () => {
