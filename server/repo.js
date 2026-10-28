@@ -53,12 +53,13 @@ export function getLiveFile(db, id) {
 export function findLiveBySha(db, accountId, sha256) {
   return parseRow(db.prepare('SELECT * FROM files WHERE account_id = ? AND sha256 = ? AND deleted_at IS NULL ORDER BY created_at LIMIT 1').get(accountId, sha256));
 }
-export function listFiles(db, accountId, { kind = null, since = null, before = null, limit = 100 } = {}) {
+export function listFiles(db, accountId, { kind = null, since = null, before = null, beforeId = null, limit = 100 } = {}) {
   const where = ['account_id = ?', 'deleted_at IS NULL'];
   const args = [accountId];
   if (kind) { where.push('kind = ?'); args.push(kind); }
   if (since) { where.push('created_at >= ?'); args.push(since); }
-  if (before) { where.push('created_at < ?'); args.push(before); }
+  if (before && beforeId) { where.push('(created_at < ? OR (created_at = ? AND id < ?))'); args.push(before, before, beforeId); }
+  else if (before) { where.push('created_at < ?'); args.push(before); }
   args.push(limit);
   return db.prepare(`SELECT * FROM files WHERE ${where.join(' AND ')} ORDER BY created_at DESC, id DESC LIMIT ?`).all(...args).map(parseRow);
 }

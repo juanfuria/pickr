@@ -55,6 +55,8 @@ test('files: insert, get, live, sha lookup, list order and filters, delete/resto
   assert.deepEqual(repo.listFiles(db, a.id, { kind: 'video' }).map(r => r.id), ['f2aaaaaaaaaa']);
   assert.deepEqual(repo.listFiles(db, a.id, { since: '2026-01-15' }).map(r => r.id), ['f2aaaaaaaaaa']);
   assert.deepEqual(repo.listFiles(db, a.id, { before: '2026-02-01T00:00:00.000Z' }).map(r => r.id), ['f1aaaaaaaaaa']);
+  repo.insertFile(db, fileRow({ id: 'f0aaaaaaaaaa', accountId: a.id, sha256: 'd'.repeat(64), createdAt: '2026-02-01T00:00:00.000Z' }));
+  assert.deepEqual(repo.listFiles(db, a.id, { before: '2026-02-01T00:00:00.000Z', beforeId: 'f2aaaaaaaaaa' }).map(r => r.id), ['f0aaaaaaaaaa', 'f1aaaaaaaaaa'], 'a tied timestamp is not skipped');
   assert.deepEqual(repo.listFiles(db, a.id, { limit: 1 }).map(r => r.id), ['f2aaaaaaaaaa']);
 
   repo.markDeleted(db, 'f1aaaaaaaaaa', '2026-04-01T00:00:00.000Z');
@@ -70,7 +72,7 @@ test('files: insert, get, live, sha lookup, list order and filters, delete/resto
   assert.equal(repo.getFile(db, 'f1aaaaaaaaaa').original_name, 'renamed.jpg');
   repo.setOwner(db, 'f1aaaaaaaaaa', b.id);
   assert.equal(repo.getFile(db, 'f1aaaaaaaaaa').account_id, b.id);
-  assert.deepEqual(repo.accountStats(db, a.id), { files: 1, bytes: 20 });
+  assert.deepEqual(repo.accountStats(db, a.id), { files: 2, bytes: 30 });
   assert.deepEqual(repo.accountStats(db, b.id), { files: 2, bytes: 20 });
 
   repo.deleteFileRow(db, 'f1aaaaaaaaaa');
