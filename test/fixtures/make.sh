@@ -35,12 +35,20 @@ cat > scripted.svg <<'SVG'
 </svg>
 SVG
 
-cat > doc.pdf <<'PDF'
-%PDF-1.1
-1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj
-2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj
-3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]>>endobj
-trailer<</Root 1 0 R>>
-PDF
+# A structurally valid one-page PDF: objects, an xref table with correct byte offsets, trailer, startxref, %%EOF.
+python3 - <<'PY'
+objs = [b"<</Type/Catalog/Pages 2 0 R>>", b"<</Type/Pages/Kids[3 0 R]/Count 1>>", b"<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]>>"]
+out = b"%PDF-1.4\n"
+offsets = []
+for i, o in enumerate(objs, 1):
+    offsets.append(len(out))
+    out += f"{i} 0 obj\n".encode() + o + b"\nendobj\n"
+xref = len(out)
+out += f"xref\n0 {len(objs) + 1}\n0000000000 65535 f \n".encode()
+for off in offsets:
+    out += f"{off:010d} 00000 n \n".encode()
+out += f"trailer\n<</Size {len(objs) + 1}/Root 1 0 R>>\nstartxref\n{xref}\n%%EOF\n".encode()
+open("doc.pdf", "wb").write(out)
+PY
 
 ls -l
