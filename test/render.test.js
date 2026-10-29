@@ -72,6 +72,13 @@ test('animation is kept unless the format drops it', async () => {
   assert.equal((await dims(still.body))[3], 1);
 });
 
+test('an animation is never enlarged', async () => {
+  const big = await renderImage(fixture('animated.gif'), P({ w: '1000', up: '1' }));
+  const [width, , , pages] = await dims(big.body);
+  assert.equal(width, 120);
+  assert.ok(pages > 1);
+});
+
 test('derivatives carry no metadata', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'pickr-render-'));
   const p = join(dir, 'out.jpg');

@@ -10,7 +10,7 @@ const ANIMATED_IN = new Set(['gif', 'webp']);
 // Memory and time on a one-core, 833 MB box: an encoder's cost grows with output area, AVIF's most of all.
 const FORMAT_EDGE = { avif: 1600, webp: 2560 };
 const MAX_FRAMES = 100;
-const MAX_FRAME_PIXELS = 40_000_000; // all frames of an animation together
+const MAX_FRAME_PIXELS = 16_000_000; // all frames of an animation together, decoded and resized
 const TIMEOUT = { seconds: 20 };
 
 export async function renderImage(input, p, { maxEdge = MAX_EDGE, maxFramePixels = MAX_FRAME_PIXELS } = {}) {
@@ -19,6 +19,7 @@ export async function renderImage(input, p, { maxEdge = MAX_EDGE, maxFramePixels
   const pages = meta.pages ?? 1;
   // Only animated inputs animate (a multi-page TIFF is pages, not frames), and only into a format that can animate.
   const animated = pages > 1 && ANIMATED_IN.has(meta.format) && (p.fm === null || p.fm === 'webp');
+  const enlarge = p.up && !animated; // an animation is never enlarged: the frame budget counts input pixels
   const inputFormat = meta.format === 'heif' ? 'avif' : meta.format;
   const fmt = p.fm ?? (inputFormat in MIME ? inputFormat : 'png');
   const edge = Math.min(maxEdge, FORMAT_EDGE[fmt] ?? maxEdge);
@@ -31,10 +32,10 @@ export async function renderImage(input, p, { maxEdge = MAX_EDGE, maxFramePixels
   const w = p.w ? Math.min(Math.round(p.w * p.dpr), edge) : null;
   const h = p.h ? Math.min(Math.round(p.h * p.dpr), edge) : null;
   if (w && h) {
-    img = img.resize({ width: w, height: h, fit: p.fit, withoutEnlargement: !p.up });
+    img = img.resize({ width: w, height: h, fit: p.fit, withoutEnlargement: !enlarge });
   } else if (w || h) {
     // One axis given: the other is bounded by the edge so an upscale of a thin image can never explode the free side.
-    img = img.resize({ width: w ?? edge, height: h ?? edge, fit: 'inside', withoutEnlargement: !p.up });
+    img = img.resize({ width: w ?? edge, height: h ?? edge, fit: 'inside', withoutEnlargement: !enlarge });
   } else {
     img = img.resize({ width: edge, height: edge, fit: 'inside', withoutEnlargement: true });
   }
