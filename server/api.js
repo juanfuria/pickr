@@ -1,8 +1,8 @@
 import { createWriteStream } from 'node:fs';
-import { unlink } from 'node:fs/promises';
+import { stat, unlink } from 'node:fs/promises';
 import { pipeline } from 'node:stream/promises';
 import { ingest } from './ingest.js';
-import { newTmpPath, moveToTrash, restoreFromTrash, ensureSpace } from './store.js';
+import { newTmpPath, moveToTrash, restoreFromTrash, ensureSpace, trashPath } from './store.js';
 import { httpError } from './http.js';
 import { generateKey } from './auth.js';
 import {
@@ -72,7 +72,15 @@ export default async function apiRoutes(app, { db, root, publicUrl, purge }) {
     const row = owned(req);
     // Move first, then mark: a crash in between leaves a live row whose file is in trash/ (a private 404), never a
     // trashed row whose file is still public.
-    await moveToTrash(root, row.id, row.ext);
+    try {
+      await moveToTrash(root, row.id, row.ext);
+    } catch (e) {
+      if (e.code !== 'ENOENT') throw e;
+      // The file is not in files/: a concurrent DELETE moved it (the row is already trashed, so 404), or a crash
+      // between move and mark left it in trash/ with the row live (finish the job).
+      if (!getLiveFile(db, row.id)) throw httpError(404, 'not found');
+      if (!(await stat(trashPath(root, row.id, row.ext)).then(() => true, () => false))) throw e;
+    }
     markDeleted(db, row.id);
     if (!(await purge(row.id, row.ext))) req.log.error({ id: row.id }, 'cache purge failed: variants may stay public until the next sweep');
     return reply.code(204).send();

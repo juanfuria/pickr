@@ -132,6 +132,30 @@ test('delete and restore roll the row back when the file move fails', async () =
   await cleanup();
 });
 
+test('two concurrent deletes of one file: no 500, and the row ends trashed', async () => {
+  const { app, key, db, cleanup } = await makeApp();
+  const { getFile } = await import('../server/repo.js');
+  const f = (await upload(app, key, 'alpha.png')).json();
+  const del = () => app.inject({ method: 'DELETE', url: `/api/files/${f.id}`, headers: auth(key) });
+  const codes = (await Promise.all([del(), del()])).map(r => r.statusCode);
+  assert.ok(!codes.includes(500), `no 500, got ${codes}`);
+  assert.ok(codes.includes(204), `at least one 204, got ${codes}`);
+  assert.notEqual(getFile(db, f.id).deleted_at, null);
+  await cleanup();
+});
+
+test('a delete finishes the job when a crash left the file in trash with the row live', async () => {
+  const { app, key, root, db, cleanup } = await makeApp();
+  const { rename } = await import('node:fs/promises');
+  const { getFile } = await import('../server/repo.js');
+  const f = (await upload(app, key, 'alpha.png')).json();
+  await rename(filePath(root, f.id, 'png'), trashPath(root, f.id, 'png')); // a crash between the move and the mark
+  const del = await app.inject({ method: 'DELETE', url: `/api/files/${f.id}`, headers: auth(key) });
+  assert.equal(del.statusCode, 204);
+  assert.notEqual(getFile(db, f.id).deleted_at, null);
+  await cleanup();
+});
+
 test('keys: list, create shown once, revoke including the one in use, me', async () => {
   const { app, key, cleanup } = await makeApp();
   const list = (await app.inject({ method: 'GET', url: '/api/keys', headers: auth(key) })).json();
