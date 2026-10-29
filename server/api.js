@@ -70,7 +70,12 @@ export default async function apiRoutes(app, { db, root, publicUrl, purge }) {
   app.delete('/api/files/:id', async (req, reply) => {
     const row = owned(req);
     markDeleted(db, row.id);
-    await moveToTrash(root, row.id, row.ext);
+    try {
+      await moveToTrash(root, row.id, row.ext);
+    } catch (e) {
+      markRestored(db, row.id); // the file is still where it was; the row must say so
+      throw e;
+    }
     await purge(row.id, row.ext);
     return reply.code(204).send();
   });
@@ -79,7 +84,12 @@ export default async function apiRoutes(app, { db, root, publicUrl, purge }) {
     const row = owned(req, { live: false });
     // Claim the row first: the nightly sweep claims trashed rows the same way from its own process, so only one wins.
     if (!row.deleted_at || !markRestored(db, row.id)) throw httpError(404, 'not found');
-    await restoreFromTrash(root, row.id, row.ext);
+    try {
+      await restoreFromTrash(root, row.id, row.ext);
+    } catch (e) {
+      markDeleted(db, row.id, row.deleted_at); // the file never left trash/; keep the original trash date
+      throw e;
+    }
     return pub(getFile(db, row.id));
   });
 

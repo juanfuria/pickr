@@ -111,6 +111,26 @@ test('delete to trash purges, restore brings back, ownership is a 404', async ()
   await cleanup();
 });
 
+test('delete and restore roll the row back when the file move fails', async () => {
+  const { app, key, root, db, cleanup } = await makeApp();
+  const { unlink } = await import('node:fs/promises');
+  const { getFile } = await import('../server/repo.js');
+  const f = (await upload(app, key, 'alpha.png')).json();
+  await unlink(filePath(root, f.id, 'png')); // simulate a move that cannot happen
+  const del = await app.inject({ method: 'DELETE', url: `/api/files/${f.id}`, headers: auth(key) });
+  assert.equal(del.statusCode, 500);
+  assert.equal(getFile(db, f.id).deleted_at, null, 'the row stays live when the file did not move');
+
+  const g = (await upload(app, key, 'doc.pdf')).json();
+  assert.equal((await app.inject({ method: 'DELETE', url: `/api/files/${g.id}`, headers: auth(key) })).statusCode, 204);
+  const trashedAt = getFile(db, g.id).deleted_at;
+  await unlink(trashPath(root, g.id, 'pdf'));
+  const back = await app.inject({ method: 'POST', url: `/api/files/${g.id}/restore`, headers: auth(key) });
+  assert.equal(back.statusCode, 500);
+  assert.equal(getFile(db, g.id).deleted_at, trashedAt, 'the row stays trashed, with its original date, when the file did not move');
+  await cleanup();
+});
+
 test('keys: list, create shown once, revoke including the one in use, me', async () => {
   const { app, key, cleanup } = await makeApp();
   const list = (await app.inject({ method: 'GET', url: '/api/keys', headers: auth(key) })).json();
