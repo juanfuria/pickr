@@ -5,7 +5,7 @@ import { pipeline } from 'node:stream/promises';
 import { readMeta, kindFromMime, stripImage, stripVideo, personalTags } from './metadata.js';
 import { measureImage, measureVideo } from './measure.js';
 import { newId, isValidId } from './ids.js';
-import { filePath } from './store.js';
+import { filePath, ensureSpace } from './store.js';
 import { findLiveBySha, insertFile, deleteFileRow } from './repo.js';
 import { httpError } from './http.js';
 import { now } from './db.js';
@@ -19,7 +19,9 @@ export async function sha256File(path) {
 export async function ingest({ db, root, tmpPath, accountId, originalName = null, id = null, createdAt = null, dedupe = true }) {
   try {
     if (id !== null && !isValidId(id)) throw httpError(400, 'invalid id');
-    if ((await stat(tmpPath)).size === 0) throw httpError(422, 'empty file');
+    const size = (await stat(tmpPath)).size;
+    if (size === 0) throw httpError(422, 'empty file');
+    await ensureSpace(root, size);
 
     let info;
     try { info = await readMeta(tmpPath); } catch (e) { throw failed('unreadable file', e, tmpPath); }

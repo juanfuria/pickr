@@ -16,8 +16,18 @@ test('paths and layout', async () => {
   assert.ok(newTmpPath(root).startsWith(join(root, 'tmp') + '/'));
   assert.notEqual(newTmpPath(root), newTmpPath(root));
   await ensureLayout(root);
+  assert.equal((await stat(join(root, 'files'))).mode & 0o777, 0o750);
+  assert.equal((await stat(join(root, 'trash'))).mode & 0o777, 0o700);
+  assert.equal((await stat(join(root, 'tmp'))).mode & 0o777, 0o700);
   for (const d of ['files', 'trash', 'tmp']) assert.ok((await stat(join(root, d))).isDirectory());
   await cleanup();
+});
+
+test('ensureSpace refuses work that would cross the reserve', async () => {
+  const { ensureSpace } = await import('../server/store.js');
+  const fake = free => async () => ({ bavail: free, bsize: 1 });
+  await ensureSpace('/', 100, { reserve: 1000, statfsImpl: fake(2000) });
+  await assert.rejects(ensureSpace('/', 1500, { reserve: 1000, statfsImpl: fake(2000) }), e => e.status === 507 && e.message === 'not enough space on the server');
 });
 
 test('trash and restore move the file', async () => {

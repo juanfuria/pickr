@@ -2,7 +2,7 @@ import { createWriteStream } from 'node:fs';
 import { unlink } from 'node:fs/promises';
 import { pipeline } from 'node:stream/promises';
 import { ingest } from './ingest.js';
-import { newTmpPath, moveToTrash, restoreFromTrash } from './store.js';
+import { newTmpPath, moveToTrash, restoreFromTrash, ensureSpace } from './store.js';
 import { httpError } from './http.js';
 import { generateKey } from './auth.js';
 import {
@@ -28,6 +28,7 @@ export default async function apiRoutes(app, { db, root, publicUrl, purge }) {
 
   app.post('/api/files', async (req, reply) => {
     if (!req.isMultipart()) throw httpError(400, 'multipart upload with a "file" field required');
+    await ensureSpace(root, 2 * (Number(req.headers['content-length']) || 0));
     const part = await req.file();
     if (!part || part.fieldname !== 'file') throw httpError(400, 'multipart upload with a "file" field required');
     const tmp = newTmpPath(root);

@@ -12,7 +12,7 @@ Base URL `https://i.juan.is`. Every `/api/` request needs `Authorization: Bearer
      "bytes":123456,"width":4032,"height":3024,"duration":null,"original_name":"photo.jpg",
      "taken_at":"2026-05-03T10:11:12+02:00","created_at":"2026-10-28T12:00:00.000Z","deleted_at":null,"existing":false}
 
-Any file type is accepted, up to 1 GB. The multipart field must be called `file`. Images and videos are stored with their metadata removed (GPS, camera, dates); the metadata is kept in the record and visible to you through `GET /api/files/:id`.
+Any file type is accepted, up to 1 GB. The multipart field must be called `file`. Images and videos are stored with their metadata removed (GPS, camera, dates); the metadata is kept in the record and visible to you through `GET /api/files/:id`. SVG, PDF, audio and every other file are stored exactly as uploaded, metadata included.
 
 ## Use the URL
 
@@ -25,9 +25,9 @@ Any file type is accepted, up to 1 GB. The multipart field must be called `file`
     https://i.juan.is/ID.mp4?t=3&w=400    a frame at 3 s, 400 wide
     https://i.juan.is/ID.pdf?dl=1         download with the original filename
 
-Parameters: `w`, `h` (pixels), `fit` = `inside` (default) | `cover` | `fill`, `fm` = `jpg` | `png` | `webp` | `avif`, `q` = 1–100 (default 80), `dpr` = 1–3, `up=1` to allow enlarging, `t` = seconds (video). Unknown parameters are ignored. Output is capped at 4096 pixels on both sides, so `w` alone on a very tall image can come back narrower than asked. HEIC originals are served as they are, whatever the parameters.
+Parameters: `w`, `h` (pixels), `fit` = `inside` (default) | `cover` | `fill`, `fm` = `jpg` | `png` | `webp` | `avif`, `q` = 1–100 (default 80), `dpr` = 1–3, `up=1` to allow enlarging, `t` = seconds (video). Unknown parameters are ignored. Output is capped at 4096 pixels on both sides (2560 for WebP, 1600 for AVIF), so `w` alone on a very tall image can come back narrower than asked. `dpr` accepts fractions such as 1.5. HEIC originals are served as they are, whatever the parameters.
 
-Errors are JSON `{"error": "…"}` and are never cached. A `503 {"error": "busy"}` with `Retry-After` means too many renders are running at once: wait that many seconds and ask again. A `422` means the file cannot be rendered with those parameters. A query that changes nothing (an unknown parameter, or any parameter on a file that cannot be rendered) answers `302` to the plain URL. Too many API requests from one address answer `429`: slow down.
+Errors are JSON `{"error": "…"}` and are never cached. A `503 {"error": "busy"}` with `Retry-After` means too many renders are running at once: wait that many seconds and ask again. A `422` means the file cannot be rendered with those parameters. A query that changes nothing (an unknown parameter, or any parameter on a file that cannot be rendered) answers `302` to the plain URL. Too many API requests from one address answer `429`: slow down. A `507` means the server is short of disk space; try again later.
 
 ## Manage
 
