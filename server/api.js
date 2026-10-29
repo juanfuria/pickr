@@ -70,13 +70,10 @@ export default async function apiRoutes(app, { db, root, publicUrl, purge }) {
 
   app.delete('/api/files/:id', async (req, reply) => {
     const row = owned(req);
+    // Move first, then mark: a crash in between leaves a live row whose file is in trash/ (a private 404), never a
+    // trashed row whose file is still public.
+    await moveToTrash(root, row.id, row.ext);
     markDeleted(db, row.id);
-    try {
-      await moveToTrash(root, row.id, row.ext);
-    } catch (e) {
-      markRestored(db, row.id); // the file is still where it was; the row must say so
-      throw e;
-    }
     if (!(await purge(row.id, row.ext))) req.log.error({ id: row.id }, 'cache purge failed: variants may stay public until the next sweep');
     return reply.code(204).send();
   });

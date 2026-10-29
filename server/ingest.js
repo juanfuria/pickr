@@ -47,7 +47,11 @@ export async function ingest({ db, root, tmpPath, accountId, originalName = null
     const sha256 = await sha256File(tmpPath);
     if (dedupe) {
       const existing = findLiveBySha(db, accountId, sha256);
-      if (existing) { await unlink(tmpPath); return { file: existing, existing: true }; }
+      // A row whose file never reached files/ (a crash between insert and rename) must not be handed out again.
+      if (existing && await stat(filePath(root, existing.id, existing.ext)).then(() => true, () => false)) {
+        await unlink(tmpPath);
+        return { file: existing, existing: true };
+      }
     }
 
     let width = null, height = null, duration = null;
@@ -66,8 +70,8 @@ export async function ingest({ db, root, tmpPath, accountId, originalName = null
       originalName: originalName ?? null, takenAt: info.takenAt, meta: info.meta, createdAt: createdAt ?? now(),
     });
     try {
+      await chmod(tmpPath, 0o640);
       await rename(tmpPath, filePath(root, fileId, ext));
-      await chmod(filePath(root, fileId, ext), 0o640);
     } catch (e) {
       deleteFileRow(db, fileId);
       throw e;
@@ -82,6 +86,7 @@ export async function ingest({ db, root, tmpPath, accountId, originalName = null
 // The client gets a fixed message; the tool's own line travels on err.detail for the server log, with the temp path
 // blanked and warnings skipped in favour of the first "Error" line.
 function failed(message, e, path) {
+  if (e?.signal || e?.code === 'ENOENT') throw e; // killed (memory) or a missing tool: the box, not the file
   const lines = String(e?.stderr || e?.message || e).split('\n').map(l => l.trim()).filter(Boolean);
   const line = lines.find(l => /^Error/i.test(l)) ?? lines[lines.length - 1] ?? '';
   const err = httpError(422, message);

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { copyFile, readdir, readFile, stat } from 'node:fs/promises';
+import { copyFile, readdir, readFile, stat, unlink } from 'node:fs/promises';
 import { makeRoot, fixture, exif } from './helpers.js';
 import { ingest } from '../server/ingest.js';
 import { createAccount, getFile } from '../server/repo.js';
@@ -48,6 +48,18 @@ test('the same bytes twice returns the existing record and stores nothing new', 
   const forced = await ingest({ db, root, tmpPath: await staged(root, 'alpha.png'), accountId: a.id, dedupe: false, id: 'pickr_00000001' });
   assert.equal(forced.existing, false);
   assert.equal(forced.file.id, 'pickr_00000001');
+  await cleanup();
+});
+
+test('dedupe never hands out a row whose file is missing', async () => {
+  const { root, db, cleanup } = await makeRoot();
+  const a = createAccount(db, 'juan');
+  const first = (await ingest({ db, root, tmpPath: await staged(root, 'alpha.png'), accountId: a.id })).file;
+  await unlink(filePath(root, first.id, first.ext));
+  const second = await ingest({ db, root, tmpPath: await staged(root, 'alpha.png'), accountId: a.id });
+  assert.equal(second.existing, false);
+  assert.notEqual(second.file.id, first.id);
+  await stat(filePath(root, second.file.id, second.file.ext));
   await cleanup();
 });
 
