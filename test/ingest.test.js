@@ -1,8 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { copyFile, readdir, readFile, stat, unlink } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { makeRoot, fixture, exif } from './helpers.js';
-import { ingest } from '../server/ingest.js';
+import { ingest, chooseExt } from '../server/ingest.js';
 import { createAccount, getFile } from '../server/repo.js';
 import { filePath, newTmpPath } from '../server/store.js';
 
@@ -153,4 +155,30 @@ test('a TIFF is stored with no personal tag left', async () => {
   const { personalTags, readMeta } = await import('../server/metadata.js');
   assert.deepEqual(personalTags((await readMeta(filePath(root, file.id, file.ext))).meta), []);
   await cleanup();
+});
+
+test('an import hint keeps an equivalent extension and nothing else', async () => {
+  const { root, db, cleanup } = await makeRoot();
+  const a = createAccount(db, 'juan');
+  const j = (await ingest({ db, root, tmpPath: await staged(root, 'photo.jpg'), accountId: a.id, extHint: 'jpeg', dedupe: false })).file;
+  assert.equal(j.ext, 'jpeg');
+  assert.equal(j.mime, 'image/jpeg');
+  const p = (await ingest({ db, root, tmpPath: await staged(root, 'photo.jpg'), accountId: a.id, extHint: 'png', dedupe: false })).file;
+  assert.equal(p.ext, 'jpg', 'a hint naming another format is ignored');
+  // a 3gp container with mp4-compatible streams, hinted mp4, is remuxed and stored as mp4
+  const gp = newTmpPath(root);
+  await promisify(execFile)('ffmpeg', ['-y', '-v', 'error', '-i', fixture('clip.mp4'), '-c', 'copy', '-f', '3gp', gp]);
+  const v = (await ingest({ db, root, tmpPath: gp, accountId: a.id, extHint: 'mp4', dedupe: false })).file;
+  assert.equal(v.ext, 'mp4');
+  assert.equal(v.mime, 'video/mp4');
+  await cleanup();
+});
+
+test('chooseExt keeps a hint only when it names the same format', () => {
+  assert.equal(chooseExt('jpg', 'jpeg'), 'jpeg');
+  assert.equal(chooseExt('jpg', 'JPEG'), 'jpeg');
+  assert.equal(chooseExt('jpg', 'png'), 'jpg');
+  assert.equal(chooseExt('3gp', 'mp4'), 'mp4');
+  assert.equal(chooseExt('mp4', null), 'mp4');
+  assert.equal(chooseExt('bin', 'html'), 'bin');
 });

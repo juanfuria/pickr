@@ -16,7 +16,16 @@ export async function sha256File(path) {
   return h.digest('hex');
 }
 
-export async function ingest({ db, root, tmpPath, accountId, originalName = null, id = null, createdAt = null, dedupe = true }) {
+// An import may keep its old extension when it names the same thing (jpeg for jpg, mp4 for a 3gp or mov the strip
+// remuxes into mp4), so old URLs keep working. New uploads never pass a hint: the uploader's name never decides.
+const SAME = [['jpg', 'jpeg', 'jpe'], ['tif', 'tiff'], ['mp4', 'm4v', '3gp', 'mov']];
+export function chooseExt(detected, hint) {
+  const h = String(hint ?? '').toLowerCase();
+  if (!h || h === detected) return detected;
+  return SAME.some(g => g.includes(detected) && g.includes(h)) ? h : detected;
+}
+
+export async function ingest({ db, root, tmpPath, accountId, originalName = null, id = null, createdAt = null, dedupe = true, extHint = null }) {
   try {
     if (id !== null && !isValidId(id)) throw httpError(400, 'invalid id');
     const size = (await stat(tmpPath)).size;
@@ -28,7 +37,7 @@ export async function ingest({ db, root, tmpPath, accountId, originalName = null
     const kind = kindFromMime(info.mime);
     // The extension is exiftool's verdict or 'bin': never the uploader's name, which nginx would otherwise turn into a
     // content type (an unknown blob called x.html must not be served as text/html).
-    const ext = info.ext ?? 'bin';
+    const ext = chooseExt(info.ext ?? 'bin', extHint);
 
     let mime = info.mime;
     if (kind === 'video' || (kind === 'image' && info.mime !== 'image/svg+xml')) {
