@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, chmod } from 'node:fs/promises';
 import { openAsBlob } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { homedir } from 'node:os';
@@ -49,6 +49,7 @@ const commands = {
     if (!url || !key) die('usage: pickr init URL KEY');
     await mkdir(dirname(CONFIG), { recursive: true, mode: 0o700 });
     await writeFile(CONFIG, JSON.stringify({ url: url.replace(/\/+$/, ''), key }) + '\n', { mode: 0o600 });
+    await chmod(CONFIG, 0o600); // writeFile's mode applies only on creation; an existing loose file must be tightened
     console.log(`config written to ${CONFIG}`);
   },
   async up() {
@@ -72,12 +73,12 @@ const commands = {
   },
   async rm() {
     if (!rest[0]) die('usage: pickr rm ID');
-    await call('DELETE', `/api/files/${rest[0]}`);
+    await call('DELETE', `/api/files/${encodeURIComponent(rest[0])}`);
     console.log(`${rest[0]} moved to trash`);
   },
   async restore() {
     if (!rest[0]) die('usage: pickr restore ID');
-    await call('POST', `/api/files/${rest[0]}/restore`);
+    await call('POST', `/api/files/${encodeURIComponent(rest[0])}/restore`);
     console.log(`${rest[0]} restored`);
   },
   async keys() {
@@ -92,5 +93,10 @@ const commands = {
   },
 };
 
-if (!commands[cmd]) die('usage: pickr <init|up|ls|rm|restore|keys|me> [--json] [--kind image|video|file]');
-await commands[cmd]();
+if (!Object.hasOwn(commands, cmd ?? '')) die('usage: pickr <init|up|ls|rm|restore|keys|me> [--json] [--kind image|video|file]');
+try {
+  await commands[cmd]();
+} catch (e) {
+  // one line, never a stack: "fetch failed: connect ECONNREFUSED …" or "ENOENT: no such file or directory, …"
+  die(e?.cause?.message ? `${e.message}: ${e.cause.message}` : String(e?.message ?? e));
+}

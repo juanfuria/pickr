@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { readFile, stat } from 'node:fs/promises';
+import { readFile, stat, chmod } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { makeApp, fixture } from './helpers.js';
@@ -10,9 +10,10 @@ import { makeApp, fixture } from './helpers.js';
 const run = promisify(execFile);
 const BIN = join(dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'pickr.js');
 
-test('init, up, ls, rm, restore, keys, me', async () => {
+test('init, up, ls, rm, restore, keys, me', async t => {
   const { app, key, root, cleanup } = await makeApp({ publicUrl: 'http://127.0.0.1' });
   await app.listen({ port: 0, host: '127.0.0.1' });
+  t.after(cleanup); // a failing assertion must not leave the server running, or the run hangs instead of failing
   const url = `http://127.0.0.1:${app.server.address().port}`;
   const cfg = join(root, 'cli.json');
   const cli = (...args) => run(process.execPath, [BIN, ...args], { env: { ...process.env, PICKR_CONFIG: cfg, PATH: '/nonexistent' } });
@@ -20,6 +21,10 @@ test('init, up, ls, rm, restore, keys, me', async () => {
   await cli('init', url, key);
   assert.equal(((await stat(cfg)).mode & 0o777), 0o600);
   assert.deepEqual(JSON.parse(await readFile(cfg, 'utf8')), { url, key });
+  await chmod(cfg, 0o644);
+  await cli('init', url, key);
+  assert.equal(((await stat(cfg)).mode & 0o777), 0o600, 're-running init tightens an existing config');
+  await assert.rejects(cli('up', join(root, 'missing.jpg')), e => e.code === 1 && /ENOENT/.test(e.stderr) && !/\n\s+at /.test(e.stderr), 'one line, no stack');
 
   const up = await cli('up', fixture('alpha.png'), fixture('doc.pdf'));
   const urls = up.stdout.trim().split('\n');
@@ -46,5 +51,5 @@ test('init, up, ls, rm, restore, keys, me', async () => {
   assert.match((await cli('keys')).stdout, /test/);
   assert.match((await cli('me')).stdout, /juan/);
   await assert.rejects(cli('bogus'), e => e.code === 1);
-  await cleanup();
+  await assert.rejects(cli('constructor'), e => e.code === 1, 'inherited names are not commands');
 });
