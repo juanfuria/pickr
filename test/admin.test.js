@@ -29,6 +29,8 @@ test('accounts and keys', async () => {
   const db2 = openDb(join(root, 'pickr.sqlite'));
   assert.deepEqual(authenticate(db2, `Bearer ${key}`), { accountId: 2, keyId: 1 });
   assert.equal(listKeys(db2, 2)[0].label, "Marta's laptop");
+  await assert.rejects(admin(root, ['key', 'revoke', '1abc']), e => e.code === 1);
+  assert.deepEqual(authenticate(db2, `Bearer ${key}`), { accountId: 2, keyId: 1 }, 'key 1 stays live');
   await admin(root, ['key', 'revoke', '1']);
   assert.equal(authenticate(db2, `Bearer ${key}`), null);
   await assert.rejects(admin(root, ['key', 'revoke', '1']));
@@ -52,5 +54,6 @@ test('chown and sweep', async () => {
   assert.equal((await admin(root, ['sweep'], { PICKR_NOW: '2026-01-20T00:00:00.000Z' })).stdout, 'removed=0 tmp=0 failed=0 purge_failed=0\n');
   assert.equal((await admin(root, ['sweep'], { PICKR_NOW: '2026-03-01T00:00:00.000Z' })).stdout, 'removed=1 tmp=0 failed=0 purge_failed=1\n');
   await assert.rejects(admin(root, ['bogus']));
+  await assert.rejects(admin(root, ['constructor']), e => e.code === 1);
   await cleanup();
 });

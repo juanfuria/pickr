@@ -40,6 +40,7 @@ const commands = {
   },
   async 'key revoke'() {
     need(3, 'key revoke ID');
+    if (!/^\d+$/.test(argv[2])) die('key ids are whole numbers');
     const id = Number.parseInt(argv[2], 10);
     const row = db.prepare('SELECT account_id FROM keys WHERE id = ?').get(id);
     if (!row || !revokeKey(db, row.account_id, id, now.toISOString())) die(`no live key with id ${argv[2]}`);
@@ -62,7 +63,7 @@ const commands = {
 };
 
 const name = [argv[0], argv[1]].filter(Boolean).join(' ');
-const cmd = commands[name] ?? commands[argv[0]];
+const cmd = Object.hasOwn(commands, name) ? commands[name] : Object.hasOwn(commands, argv[0] ?? '') ? commands[argv[0]] : null;
 if (!cmd) die(`usage: pickr-admin <account add|account list|key add|key revoke|file chown|sweep> …`);
 try {
   await cmd();

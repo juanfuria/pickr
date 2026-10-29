@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readFile, writeFile, mkdir, chmod } from 'node:fs/promises';
+import { readFile, mkdir, open, stat } from 'node:fs/promises';
 import { openAsBlob } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { homedir } from 'node:os';
@@ -24,7 +24,7 @@ function checkUrl(raw) {
   let u;
   try { u = new URL(raw); } catch { return null; }
   const loopback = ['127.0.0.1', 'localhost', '[::1]'].includes(u.hostname);
-  if (u.username || u.password || u.search || u.hash) return null;
+  if (u.username || u.password || /[?#]/.test(u.href)) return null;
   if (u.protocol !== 'https:' && !(u.protocol === 'http:' && loopback)) return null;
   return u.href.replace(/\/+$/, '');
 }
@@ -33,7 +33,7 @@ async function loadConfig() {
   try {
     const c = JSON.parse(await readFile(CONFIG, 'utf8'));
     if (!checkUrl(c.url ?? '') || !KEY_RE.test(c.key ?? '')) throw new Error();
-    return c;
+    return { url: checkUrl(c.url), key: c.key };
   } catch {
     die(`no usable config at ${CONFIG}; run: pickr init https://i.juan.is pk_…`);
   }
@@ -66,15 +66,21 @@ const commands = {
     if (!url) die('the URL must be https:// (plain http only for localhost), with no credentials; the order is pickr init URL KEY');
     if (!KEY_RE.test(key)) die('that is not a pickr key (pk_ followed by letters, digits, _ or -); the order is pickr init URL KEY');
     await mkdir(dirname(CONFIG), { recursive: true, mode: 0o700 });
-    // tighten an existing file before the key goes into it (writeFile's mode applies only on creation)
-    await chmod(CONFIG, 0o600).catch(e => { if (e.code !== 'ENOENT') throw e; });
-    await writeFile(CONFIG, JSON.stringify({ url, key }) + '\n', { mode: 0o600 });
+    // open first (it fails on a directory before anything is changed), tighten, then write
+    const fh = await open(CONFIG, 'w', 0o600);
+    try {
+      await fh.chmod(0o600);
+      await fh.writeFile(JSON.stringify({ url, key }) + '\n');
+    } finally {
+      await fh.close();
+    }
     console.log(`config written to ${CONFIG}`);
   },
   async up() {
     if (!rest.length) die('usage: pickr up FILE…');
     const out = [];
     for (const path of rest) {
+      try { await stat(path); } catch (e) { die(`cannot read ${path}: ${e.code ?? e.message}`); }
       const form = new FormData();
       form.set('file', await openAsBlob(path), basename(path));
       const f = await call('POST', '/api/files', { form });

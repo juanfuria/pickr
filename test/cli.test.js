@@ -39,6 +39,11 @@ test('init, up, ls, rm, restore, keys, me', async t => {
   await assert.rejects(cli('init', key, url), e => e.code === 1 && /pickr init URL KEY/.test(e.stderr), 'swapped arguments are refused');
   await assert.rejects(cli('init', 'http://example.com', key), e => e.code === 1, 'plain http only for this machine');
   await assert.rejects(cli('init', url, 'pk_short'), e => e.code === 1, 'a malformed key is refused');
+  await assert.rejects(cli('init', 'https://i.juan.is?', key), e => e.code === 1, 'an empty query is refused');
+  const dir = join(root, 'a-directory');
+  await (await import('node:fs/promises')).mkdir(dir, { mode: 0o755 });
+  await assert.rejects(run(process.execPath, [BIN, 'init', url, key], { env: { ...process.env, PICKR_CONFIG: dir, PATH: '/nonexistent' } }), e => e.code === 1);
+  assert.equal((await stat(dir)).mode & 0o777, 0o755, 'a directory named as the config is left alone');
   assert.deepEqual(JSON.parse(await readFile(cfg, 'utf8')), { url, key }, 'a refused init leaves the config alone');
   await writeFile(cfg, JSON.stringify({ url: key, key: url }));
   await assert.rejects(cli('me'), e => e.code === 1 && /no usable config/.test(e.stderr), 'a swapped hand-edited config is refused');
