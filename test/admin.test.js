@@ -49,8 +49,8 @@ test('chown and sweep', async () => {
   const db2 = openDb(join(root, 'pickr.sqlite'));
   assert.equal(getFile(db2, 'f1aaaaaaaaaa').account_id, b.id);
   db2.close();
-  assert.equal((await admin(root, ['sweep'], { PICKR_NOW: '2026-01-20T00:00:00.000Z' })).stdout, 'removed=0 tmp=0 failed=0\n');
-  assert.equal((await admin(root, ['sweep'], { PICKR_NOW: '2026-03-01T00:00:00.000Z' })).stdout, 'removed=1 tmp=0 failed=0\n');
+  assert.equal((await admin(root, ['sweep'], { PICKR_NOW: '2026-01-20T00:00:00.000Z' })).stdout, 'removed=0 tmp=0 failed=0 purge_failed=0\n');
+  assert.equal((await admin(root, ['sweep'], { PICKR_NOW: '2026-03-01T00:00:00.000Z' })).stdout, 'removed=1 tmp=0 failed=0 purge_failed=1\n');
   await assert.rejects(admin(root, ['bogus']));
   await cleanup();
 });

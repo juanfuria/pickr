@@ -56,7 +56,7 @@ const commands = {
   },
   async sweep() {
     const r = await sweep({ db, root: config.root, now, trashDays: config.trashDays, purge: (id, ext) => purgeVariants(config.purgeUrl, id, ext) });
-    console.log(`removed=${r.removed} tmp=${r.tmpRemoved} failed=${r.failed.length}`);
+    console.log(`removed=${r.removed} tmp=${r.tmpRemoved} failed=${r.failed.length} purge_failed=${r.purgeFailed}`);
     for (const f of r.failed) console.log(`failed: ${f.id} ${f.error}`);
   },
 };

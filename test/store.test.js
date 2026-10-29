@@ -47,7 +47,7 @@ test('sweep removes old trash rows and files, purges, and clears stale tmp', asy
   await utimes(stale, old, old);
   const purged = [];
   const r = await sweep({ db, root, now: new Date('2026-02-05T00:00:00.000Z'), trashDays: 30, purge: async (id, ext) => purged.push(`${id}.${ext}`) });
-  assert.deepEqual(r, { removed: 1, tmpRemoved: 1, failed: [] });
+  assert.deepEqual(r, { removed: 1, tmpRemoved: 1, failed: [], purgeFailed: 0 });
   assert.equal(getFile(db, 'old0000000000'), null);
   assert.equal(getFile(db, 'new0000000000').deleted_at, '2026-01-20T00:00:00.000Z');
   await assert.rejects(stat(trashPath(root, 'old0000000000', 'txt')));

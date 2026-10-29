@@ -2,7 +2,7 @@
 // ending in '*' as a prefix, so one request removes every rendered variant of a file.
 export async function purgeVariants(purgeUrl, id, ext, { fetchImpl = fetch } = {}) {
   try {
-    const r = await fetchImpl(`${purgeUrl}/_render/${id}.${ext}*`, { method: 'PURGE' });
+    const r = await fetchImpl(`${purgeUrl}/_render/${id}.${ext}*`, { method: 'PURGE', signal: AbortSignal.timeout(5000) });
     return r.ok || r.status === 404;
   } catch {
     return false;

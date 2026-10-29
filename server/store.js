@@ -25,6 +25,7 @@ const DAY = 86_400_000;
 export async function sweep({ db, root, now = new Date(), trashDays = 30, purge = async () => {} }) {
   const cutoff = new Date(now.getTime() - trashDays * DAY).toISOString();
   let removed = 0;
+  let purgeFailed = 0;
   const failed = [];
   for (const r of trashedBefore(db, cutoff)) {
     // Claim the row before any await: a restore running in the server process claims the same row the same way,
@@ -35,7 +36,7 @@ export async function sweep({ db, root, now = new Date(), trashDays = 30, purge 
     } catch (e) {
       if (e.code !== 'ENOENT') failed.push({ id: r.id, error: e.code ?? String(e) });
     }
-    await purge(r.id, r.ext);
+    if (!(await purge(r.id, r.ext))) purgeFailed++;
     removed++;
   }
   let tmpRemoved = 0;
@@ -47,5 +48,5 @@ export async function sweep({ db, root, now = new Date(), trashDays = 30, purge 
       tmpRemoved++;
     }
   }
-  return { removed, tmpRemoved, failed };
+  return { removed, tmpRemoved, failed, purgeFailed };
 }
