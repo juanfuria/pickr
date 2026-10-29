@@ -1,0 +1,2 @@
+# nightly: empty trash older than 30 days, drop stale uploads, purge their cached variants
+7 4 * * * pickr cd /opt/pickr && PICKR_ROOT=/srv/pickr PICKR_PURGE_URL=http://127.0.0.1:8081 /usr/bin/node --no-warnings=ExperimentalWarning bin/pickr-admin.js sweep >> /srv/pickr/sweep.log 2>&1

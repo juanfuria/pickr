@@ -1,0 +1,27 @@
+[Unit]
+Description=pickr file host (i.juan.is)
+After=network.target
+
+[Service]
+Type=simple
+User=pickr
+Group=pickr
+WorkingDirectory=/opt/pickr
+Environment=NODE_ENV=production
+Environment=PICKR_ROOT=/srv/pickr
+Environment=PICKR_PORT=3100
+Environment=PICKR_URL=https://i.juan.is
+Environment=PICKR_PURGE_URL=http://127.0.0.1:8081
+ExecStart=/usr/bin/node --no-warnings=ExperimentalWarning server/index.js
+Restart=on-failure
+RestartSec=2
+MemoryMax=300M
+UMask=0027
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/srv/pickr
+
+[Install]
+WantedBy=multi-user.target
