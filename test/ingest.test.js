@@ -178,6 +178,7 @@ test('chooseExt keeps a hint only when it names the same format', () => {
   assert.equal(chooseExt('jpg', 'jpeg'), 'jpeg');
   assert.equal(chooseExt('jpg', 'JPEG'), 'jpeg');
   assert.equal(chooseExt('jpg', 'png'), 'jpg');
+  assert.equal(chooseExt('jpg', 'jpe'), 'jpg', 'nginx has no jpe type');
   assert.equal(chooseExt('3gp', 'mp4'), 'mp4');
   assert.equal(chooseExt('mp4', null), 'mp4');
   assert.equal(chooseExt('bin', 'html'), 'bin');

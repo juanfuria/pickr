@@ -18,7 +18,7 @@ export async function sha256File(path) {
 
 // An import may keep its old extension when it names the same thing (jpeg for jpg, mp4 for a 3gp or mov the strip
 // remuxes into mp4), so old URLs keep working. New uploads never pass a hint: the uploader's name never decides.
-const SAME = [['jpg', 'jpeg', 'jpe'], ['tif', 'tiff'], ['mp4', 'm4v', '3gp', 'mov']];
+const SAME = [['jpg', 'jpeg'], ['tif', 'tiff'], ['mp4', 'm4v', '3gp', 'mov']];
 export function chooseExt(detected, hint) {
   const h = String(hint ?? '').toLowerCase();
   if (!h || h === detected) return detected;
