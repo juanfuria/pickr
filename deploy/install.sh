@@ -38,6 +38,8 @@ rollback() {
   done
 }
 
+# until nginx -t runs, any failure (a cp, an ln) puts pickr's nginx files back as they were
+trap 'rollback; echo "install stopped while writing pickr nginx files: they were put back" >&2' EXIT
 cp /opt/pickr/deploy/nginx/pickr.conf /etc/nginx/conf.d/pickr.conf
 cp /opt/pickr/deploy/nginx/purge.conf /etc/nginx/sites-available/pickr-purge.conf
 # The vhost is copied once: certbot edits it, so later changes are merged by hand.
@@ -48,6 +50,7 @@ else
 fi
 ln -sf /etc/nginx/sites-available/pickr-purge.conf /etc/nginx/sites-enabled/pickr-purge.conf
 ln -sf /etc/nginx/sites-available/i.juan.is.conf /etc/nginx/sites-enabled/i.juan.is.conf
+trap - EXIT
 if ! nginx -t; then
   rollback
   echo "nginx -t failed: pickr's nginx files were put back as they were; the running nginx was not touched" >&2

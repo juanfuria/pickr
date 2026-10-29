@@ -38,6 +38,7 @@ test('nginx rewrites and the app agree on the render prefix', async () => {
   assert.match(render, /proxy_max_temp_file_size 0;/, 'downloads are never spooled to disk');
   const install = await readFile(join(ROOT, 'deploy', 'install.sh'), 'utf8');
   assert.match(install, /if ! nginx -t; then\n\s+rollback/, 'a config nginx rejects is rolled back');
+  assert.match(install, /trap 'rollback/, 'a failed write before nginx -t is rolled back too');
   const unit = await readFile(join(ROOT, 'deploy', 'systemd', 'pickr.service'), 'utf8');
   assert.match(unit, /^UMask=0077$/m, 'the database and trash are private to the service');
   assert.match(unit, /^Environment=MALLOC_ARENA_MAX=2$/m);
