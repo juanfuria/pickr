@@ -16,7 +16,9 @@ export async function makeRoot() {
   const root = await mkdtemp(join(tmpdir(), 'pickr-test-'));
   for (const d of ['files', 'trash', 'tmp']) await mkdir(join(root, d), { recursive: true });
   const db = openDb(join(root, 'pickr.sqlite'));
-  return { root, db, cleanup: async () => { db.close(); await rm(root, { recursive: true, force: true }); } };
+  // a test may close the db itself (the admin tests do, to hand the file to a child process); a second close is fine
+  const close = () => { try { db.close(); } catch (e) { if (e.code !== 'ERR_INVALID_STATE') throw e; } };
+  return { root, db, cleanup: async () => { close(); await rm(root, { recursive: true, force: true }); } };
 }
 
 export function fixture(name) {
