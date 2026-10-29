@@ -9,6 +9,8 @@ import { createLimiter } from './limiter.js';
 
 const IMMUTABLE = 'public, max-age=31536000, immutable';
 const UNRENDERABLE = new Set(['image/heic', 'image/heif']);
+// Documents a browser would run: when Node serves them (downloads), they are sandboxed and never live on this origin.
+const ACTIVE = new Set(['image/svg+xml', 'text/html', 'application/xhtml+xml', 'text/xml', 'application/xml', 'text/xsl']);
 
 // A render that fails because of the input is the client's 422, logged through detail; one our own timeout killed is
 // a 422 too (the input took too long). A render that fails because the box is broken (ffmpeg missing, a process
@@ -33,6 +35,9 @@ export default async function renderRoutes(app, { db, root, renderLimiter = crea
     // The name must match the stored name byte for byte (splitName lowercases, nginx's static path does not).
     if (!row || req.params.name !== `${row.id}.${row.ext}`) throw httpError(404, 'not found');
     const src = filePath(root, row.id, row.ext);
+    // When the answer is the original, send the client to nginx's static copy instead of streaming the whole file
+    // through Node and into the cache under a junk query. Short-lived: a later version may give that query a meaning.
+    const original = () => reply.header('Cache-Control', 'public, max-age=86400').redirect(`/${row.id}.${row.ext}`, 302);
     reply.header('Cache-Control', IMMUTABLE);
 
     const q = req.query;
@@ -44,12 +49,8 @@ export default async function renderRoutes(app, { db, root, renderLimiter = crea
     const ip = parseImageParams(q);
 
     if (row.kind === 'image') {
-      if (!ip.active) return sendOriginal(reply, row, src);
-      // sharp's prebuilt libvips reads HEIC metadata but cannot decode its HEVC pixels: serve the original, no attempt.
-      if (UNRENDERABLE.has(row.mime)) {
-        req.log.info({ id: row.id, mime: row.mime }, 'format not renderable, serving the original');
-        return sendOriginal(reply, row, src);
-      }
+      // sharp's prebuilt libvips reads HEIC metadata but cannot decode its HEVC pixels: the original, no attempt.
+      if (!ip.active || UNRENDERABLE.has(row.mime)) return original();
       let out;
       try { out = await limited(() => renderImage(src, ip)); } catch (e) { throw renderError(e, 'cannot render this image'); }
       return reply.type(out.mime).send(out.body);
@@ -57,7 +58,7 @@ export default async function renderRoutes(app, { db, root, renderLimiter = crea
 
     if (row.kind === 'video') {
       const vp = parseVideoParams(q);
-      if (!vp.active && !ip.active) return sendOriginal(reply, row, src);
+      if (!vp.active && !ip.active) return original();
       const t = Math.min(vp.t, Math.max(0, (row.duration ?? 0) - 0.1));
       let jpeg;
       try { jpeg = await limited(() => posterFrame(src, t)); } catch (e) { throw renderError(e, 'cannot extract a frame'); }
@@ -68,15 +69,14 @@ export default async function renderRoutes(app, { db, root, renderLimiter = crea
       return reply.type(out.mime).send(out.body);
     }
 
-    return sendOriginal(reply, row, src);
+    return original();
   });
 }
 
+// Only downloads (?dl=1) reach this: everything else that is "the original" is a redirect to nginx's static copy.
 function sendOriginal(reply, row, src) {
   reply.type(row.mime);
-  if (row.mime === 'image/svg+xml') {
-    reply.header('Content-Security-Policy', 'sandbox');
-    reply.header('X-Content-Type-Options', 'nosniff');
-  }
+  reply.header('X-Content-Type-Options', 'nosniff');
+  if (ACTIVE.has(row.mime)) reply.header('Content-Security-Policy', 'sandbox');
   return reply.send(createReadStream(src));
 }

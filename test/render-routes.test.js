@@ -12,18 +12,18 @@ async function put(app, key, name) {
 }
 const get = (app, url) => app.inject({ method: 'GET', url });
 
-test('original when no parameter applies; variants when they do; headers', async () => {
+test('nothing applies: a redirect to the original; variants when parameters apply; headers', async () => {
   const { app, key, cleanup } = await makeApp();
   const f = await put(app, key, 'photo.jpg');
   const orig = await get(app, `/_render/${f.id}.jpg?foo=bar`);
-  assert.equal(orig.statusCode, 200);
-  assert.equal(orig.headers['content-type'], 'image/jpeg');
-  assert.equal(orig.headers['cache-control'], 'public, max-age=31536000, immutable');
-  assert.equal(orig.rawPayload.length, f.bytes);
+  assert.equal(orig.statusCode, 302, 'nothing applies: the static original, not a stream through Node');
+  assert.equal(orig.headers.location, `/${f.id}.jpg`);
+  assert.equal(orig.headers['cache-control'], 'public, max-age=86400');
 
   const small = await get(app, `/_render/${f.id}.jpg?w=100`);
   assert.equal(small.statusCode, 200);
   assert.equal(small.headers['content-type'], 'image/jpeg');
+  assert.equal(small.headers['cache-control'], 'public, max-age=31536000, immutable');
   const m = await sharp(small.rawPayload).metadata();
   assert.deepEqual([m.width, m.height], [100, 133]);
 
@@ -62,9 +62,8 @@ test('a corrupt image is a 422; an image sharp cannot read (heic) falls back to 
   assert.equal((await get(app, '/_render/zzzzzzzzzzzz.jpg?w=10')).headers['cache-control'], 'no-store');
   const h = await put(app, key, 'photo.heic');
   const hr = await get(app, `/_render/${h.id}.heic?w=10`);
-  assert.equal(hr.statusCode, 200);
-  assert.equal(hr.headers['content-type'], 'image/heic', 'the original, untouched');
-  assert.equal(hr.rawPayload.length, h.bytes);
+  assert.equal(hr.statusCode, 302, 'never rendered: sent to the original');
+  assert.equal(hr.headers.location, `/${h.id}.heic`);
   await cleanup();
 });
 
@@ -83,7 +82,8 @@ test('video: poster frame with t, composable, clamped; plain query serves the or
   const late = await get(app, `/_render/${v.id}.mp4?t=999`);
   assert.equal(late.statusCode, 200, 't is clamped to the duration');
   const orig = await get(app, `/_render/${v.id}.mp4?foo=1`);
-  assert.equal(orig.headers['content-type'], 'video/mp4');
+  assert.equal(orig.statusCode, 302);
+  assert.equal(orig.headers.location, `/${v.id}.mp4`);
   await cleanup();
 });
 
@@ -97,7 +97,7 @@ test('when the render limiter is full the client gets a 503 with Retry-After, ne
   assert.deepEqual(r.json(), { error: 'busy' });
   assert.equal(r.headers['retry-after'], '2');
   assert.equal(r.headers['cache-control'], 'no-store');
-  assert.equal((await get(app, `/_render/${f.id}.jpg?foo=1`)).statusCode, 200, 'originals never touch the limiter');
+  assert.equal((await get(app, `/_render/${f.id}.jpg?foo=1`)).statusCode, 302, 'originals never touch the limiter');
   await cleanup();
 });
 
@@ -126,8 +126,18 @@ test('files: dl=1 with a hostile name, svg headers', async () => {
   assert.equal(dl.headers['content-type'], 'application/pdf');
   assert.equal(dl.headers['content-disposition'], `attachment; filename="talk.pdf"; filename*=UTF-8''talk.pdf`);
   assert.equal(Object.hasOwn(dl.headers, 'x-evil'), false);
+  assert.equal(dl.headers['x-content-type-options'], 'nosniff');
+  assert.equal(dl.headers['content-security-policy'], undefined, 'a PDF is not sandboxed (browsers refuse to show sandboxed PDFs)');
   const inline = await get(app, `/_render/${p.id}.pdf?w=100`);
+  assert.equal(inline.statusCode, 302);
   assert.equal(inline.headers['content-disposition'], undefined);
+
+  const page = multipart('file', 'page.html', Buffer.from('<!DOCTYPE html><html><body><script>alert(1)</script></body></html>\n'));
+  const h = (await app.inject({ method: 'POST', url: '/api/files', headers: { authorization: `Bearer ${key}`, ...page.headers }, payload: page.payload })).json();
+  assert.equal(h.mime, 'text/html');
+  const hd = await get(app, `/_render/${h.id}.${h.ext}?dl=1`);
+  assert.equal(hd.headers['content-security-policy'], 'sandbox', 'uploaded HTML never runs on this origin');
+  assert.equal(hd.headers['x-content-type-options'], 'nosniff');
 
   const s = await put(app, key, 'scripted.svg');
   const sr = await get(app, `/_render/${s.id}.svg?dl=1`);

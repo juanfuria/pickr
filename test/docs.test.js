@@ -32,4 +32,9 @@ test('nginx rewrites and the app agree on the render prefix', async () => {
   const purge = await readFile(join(ROOT, 'deploy', 'nginx', 'purge.conf'), 'utf8');
   assert.match(purge, /listen 127\.0\.0\.1:8081;/);
   assert.match(purge, /proxy_cache_key \$uri\$is_args\$args;/);
+  const render = vhost.match(/location \/_render\/ \{[\s\S]*?\n    \}/)[0];
+  assert.doesNotMatch(render, /limit_req/, 'cache hits are never rate-limited');
+  assert.match(render, /proxy_no_cache \$arg_dl;/, 'downloads are never cached');
+  const http = await readFile(join(ROOT, 'deploy', 'nginx', 'pickr.conf'), 'utf8');
+  assert.match(http, /svg\|html\?/, 'HTML is sandboxed like SVG');
 });

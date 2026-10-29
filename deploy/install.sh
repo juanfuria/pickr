@@ -19,7 +19,12 @@ runuser -u pickr -- bash -c 'cd /opt/pickr && git pull --ff-only && npm ci --omi
 
 cp /opt/pickr/deploy/nginx/pickr.conf /etc/nginx/conf.d/pickr.conf
 cp /opt/pickr/deploy/nginx/purge.conf /etc/nginx/sites-available/pickr-purge.conf
-[ -f /etc/nginx/sites-available/i.juan.is.conf ] || cp /opt/pickr/deploy/nginx/i.juan.is.conf /etc/nginx/sites-available/i.juan.is.conf
+# The vhost is copied once: certbot edits it, so later changes are merged by hand.
+if [ -f /etc/nginx/sites-available/i.juan.is.conf ]; then
+  echo "note: /etc/nginx/sites-available/i.juan.is.conf exists and is left as is; merge changes from deploy/nginx/i.juan.is.conf by hand"
+else
+  cp /opt/pickr/deploy/nginx/i.juan.is.conf /etc/nginx/sites-available/i.juan.is.conf
+fi
 ln -sf /etc/nginx/sites-available/pickr-purge.conf /etc/nginx/sites-enabled/pickr-purge.conf
 ln -sf /etc/nginx/sites-available/i.juan.is.conf /etc/nginx/sites-enabled/i.juan.is.conf
 # Two lines, not `nginx -t && …`: set -e ignores a failure on the left of &&, so a bad config would not stop the script.
