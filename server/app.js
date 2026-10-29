@@ -6,14 +6,16 @@ import apiRoutes from './api.js';
 import renderRoutes from './render-routes.js';
 
 export async function buildApp({ db, root, publicUrl, purgeUrl, purge = null, logger = false, maxBytes = 1024 ** 3 }) {
-  const app = Fastify({ logger, bodyLimit: 1024 * 1024, trustProxy: '127.0.0.1' });
+  // forceCloseConnections: a request answered before its body was read (a 400 on a wrong-field upload) keeps its
+  // socket half-open; without this, close() waits on it and a restart hangs until systemd's stop timeout.
+  const app = Fastify({ logger, bodyLimit: 1024 * 1024, trustProxy: '127.0.0.1', forceCloseConnections: true });
   await app.register(multipart, { limits: { files: 1, fileSize: maxBytes, fields: 10 } });
   app.decorateRequest('account', null);
 
   app.addHook('onRequest', async (req, reply) => {
-    // The router decodes percent-escapes before matching (/%61pi/files reaches /api/files), so the raw URL alone would
-    // let an encoded path skip this check: the matched route decides as well.
-    if (!req.url.startsWith('/api/') && !req.routeOptions.url?.startsWith('/api/')) return;
+    // Check the matched route as well as the raw URL: the router decodes percent-escapes, so /%61pi/files would
+    // otherwise reach an API handler without a key.
+    if (!req.url.startsWith('/api/') && !(req.routeOptions?.url ?? '').startsWith('/api/')) return;
     const a = authenticate(db, req.headers.authorization);
     if (!a) return reply.code(401).send({ error: 'missing or invalid key' });
     req.account = a;

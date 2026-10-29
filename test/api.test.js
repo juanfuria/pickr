@@ -23,7 +23,7 @@ test('authentication is required on /api and errors are json', async () => {
   await cleanup();
 });
 
-test('a percent-encoded /api path still needs a key and writes nothing', async () => {
+test('a percent-encoded /api path cannot skip authentication', async () => {
   const { app, root, cleanup } = await makeApp();
   for (const url of ['/%61pi/files', '/ap%69/me', '/%61pi/keys']) {
     assert.equal((await app.inject({ method: 'GET', url })).statusCode, 401, url);
@@ -131,6 +131,17 @@ test('keys: list, create shown once, revoke including the one in use, me', async
   assert.equal((await app.inject({ method: 'DELETE', url: `/api/keys/${list.keys[0].id}`, headers: auth(key) })).statusCode, 204, 'self-revocation');
   assert.equal((await app.inject({ method: 'GET', url: '/api/me', headers: auth(key) })).statusCode, 401);
   await cleanup();
+});
+
+test('a wrong-field upload with a large body does not stall close()', async () => {
+  const { app, key, cleanup } = await makeApp();
+  await app.listen({ port: 0, host: '127.0.0.1' });
+  const url = `http://127.0.0.1:${app.server.address().port}`;
+  const mp = multipart('image', 'big.bin', Buffer.alloc(2 * 1024 * 1024, 7));
+  const r = await fetch(`${url}/api/files`, { method: 'POST', headers: { authorization: `Bearer ${key}`, ...mp.headers }, body: mp.payload });
+  assert.equal(r.status, 400);
+  const closed = await Promise.race([cleanup().then(() => 'closed'), new Promise(res => setTimeout(() => res('stalled'), 3000))]);
+  assert.equal(closed, 'closed');
 });
 
 test('an upload over the size limit is a 413 and leaves nothing', async () => {
