@@ -58,6 +58,8 @@ test('a corrupt image is a 422; an image sharp cannot read (heic) falls back to 
   await writeFile(filePath(root, c.id, 'jpg'), (await readFile(fixture('photo.jpg'))).subarray(0, 2000));
   const r = await get(app, `/_render/${c.id}.jpg?w=10`);
   assert.equal(r.statusCode, 422);
+  assert.equal(r.headers['cache-control'], 'no-store', 'errors are never cacheable');
+  assert.equal((await get(app, '/_render/zzzzzzzzzzzz.jpg?w=10')).headers['cache-control'], 'no-store');
   const h = await put(app, key, 'photo.heic');
   const hr = await get(app, `/_render/${h.id}.heic?w=10`);
   assert.equal(hr.statusCode, 200);
@@ -82,6 +84,36 @@ test('video: poster frame with t, composable, clamped; plain query serves the or
   assert.equal(late.statusCode, 200, 't is clamped to the duration');
   const orig = await get(app, `/_render/${v.id}.mp4?foo=1`);
   assert.equal(orig.headers['content-type'], 'video/mp4');
+  await cleanup();
+});
+
+test('when the render limiter is full the client gets a 503 with Retry-After, never cached', async () => {
+  const { httpError } = await import('../server/http.js');
+  const busy = { run: () => { const e = httpError(503, 'busy'); e.retryAfter = 2; return Promise.reject(e); } };
+  const { app, key, cleanup } = await makeApp({ renderLimiter: busy });
+  const f = await put(app, key, 'photo.jpg');
+  const r = await get(app, `/_render/${f.id}.jpg?w=10`);
+  assert.equal(r.statusCode, 503);
+  assert.deepEqual(r.json(), { error: 'busy' });
+  assert.equal(r.headers['retry-after'], '2');
+  assert.equal(r.headers['cache-control'], 'no-store');
+  assert.equal((await get(app, `/_render/${f.id}.jpg?foo=1`)).statusCode, 200, 'originals never touch the limiter');
+  await cleanup();
+});
+
+test('a broken box is a 500, not a cached 422: missing ffmpeg', async () => {
+  const { app, key, cleanup } = await makeApp();
+  const v = await put(app, key, 'clip.mp4');
+  const saved = process.env.PATH;
+  process.env.PATH = '/nonexistent';
+  try {
+    const r = await get(app, `/_render/${v.id}.mp4?t=1`);
+    assert.equal(r.statusCode, 500);
+    assert.deepEqual(r.json(), { error: 'internal error' });
+    assert.equal(r.headers['cache-control'], 'no-store');
+  } finally {
+    process.env.PATH = saved;
+  }
   await cleanup();
 });
 

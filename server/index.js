@@ -1,8 +1,11 @@
 import { join } from 'node:path';
+import sharp from 'sharp';
 import { config } from './config.js';
 import { openDb } from './db.js';
 import { ensureLayout } from './store.js';
 import { buildApp } from './app.js';
+
+sharp.concurrency(1);
 
 await ensureLayout(config.root);
 const db = openDb(join(config.root, 'pickr.sqlite'));

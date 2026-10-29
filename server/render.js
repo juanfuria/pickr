@@ -36,8 +36,9 @@ export async function renderImage(input, p, { maxEdge = MAX_EDGE } = {}) {
 
 export async function posterFrame(path, t) {
   try {
-    const { stdout } = await run('ffmpeg', ['-v', 'error', '-ss', String(Math.max(0, t)), '-i', path, '-frames:v', '1', '-f', 'image2', '-c:v', 'mjpeg', '-q:v', '3', 'pipe:1'],
-      { encoding: 'buffer', maxBuffer: 64 * 1024 * 1024 });
+    // -nostdin so a stray prompt can never block; 30 s is more than any sane poster frame needs on this box.
+    const { stdout } = await run('ffmpeg', ['-nostdin', '-v', 'error', '-ss', String(Math.max(0, t)), '-i', path, '-frames:v', '1', '-f', 'image2', '-c:v', 'mjpeg', '-q:v', '3', 'pipe:1'],
+      { encoding: 'buffer', maxBuffer: 64 * 1024 * 1024, timeout: 30_000 });
     return Buffer.isBuffer(stdout) ? stdout : Buffer.from(stdout);
   } catch (e) {
     // Past the end of the clip ffmpeg encodes nothing and exits non-zero; that is "no frame", not a failure.
