@@ -24,10 +24,10 @@ export async function buildApp({ db, root, publicUrl, purgeUrl, purge = null, lo
   app.setNotFoundHandler((req, reply) => reply.code(404).send({ error: 'not found' }));
   app.setErrorHandler((err, req, reply) => {
     const status = err.status ?? err.statusCode ?? 500;
-    const fault = status >= 500 && status !== 503; // 503 is "busy", expected under load: not a fault, not masked
+    const fault = status >= 500 && status !== 503 && status !== 507; // 503 busy and 507 short of space are expected conditions, not faults: the client gets the reason
     // lean fields only: an execFile error carries the child's whole stdout and stderr
     if (fault) req.log.error({ err: { message: err.message, code: err.code, signal: err.signal, stack: err.stack } }, 'request failed');
-    else if (err.detail || status === 503) req.log.warn({ status, detail: err.detail }, err.message);
+    else if (err.detail || status === 503 || status === 507) req.log.warn({ status, detail: err.detail }, err.message);
     // An error is never cacheable, whatever Cache-Control the route had already set (Fastify keeps it on errors).
     reply.header('Cache-Control', 'no-store');
     if (err.retryAfter) reply.header('Retry-After', String(err.retryAfter));

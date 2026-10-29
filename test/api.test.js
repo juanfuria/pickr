@@ -5,6 +5,7 @@ import { makeApp, multipart, fixture } from './helpers.js';
 import { filePath, trashPath } from '../server/store.js';
 import { createAccount, insertKey } from '../server/repo.js';
 import { generateKey } from '../server/auth.js';
+import { httpError } from '../server/http.js';
 
 const auth = key => ({ authorization: `Bearer ${key}` });
 
@@ -170,5 +171,17 @@ test('an upload over the size limit is a 413 and leaves nothing', async () => {
   assert.equal(r.statusCode, 413);
   assert.deepEqual(await readdir(`${root}/tmp`), []);
   assert.deepEqual(await readdir(`${root}/files`), []);
+  await cleanup();
+});
+
+test('a 507 is not a fault: the client is told the server is short of space', async () => {
+  const { app, cleanup } = await makeApp();
+  // A throwaway route, added before the first inject makes the app ready: what is under test is the error handler,
+  // and a full disk cannot be arranged deterministically.
+  app.get('/full', async () => { throw httpError(507, 'not enough space on the server'); });
+  const r = await app.inject({ method: 'GET', url: '/full' });
+  assert.equal(r.statusCode, 507);
+  assert.deepEqual(r.json(), { error: 'not enough space on the server' });
+  assert.equal(r.headers['cache-control'], 'no-store');
   await cleanup();
 });
