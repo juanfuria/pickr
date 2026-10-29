@@ -12,7 +12,9 @@ Environment=PICKR_ROOT=/srv/pickr
 Environment=PICKR_PORT=3100
 Environment=PICKR_URL=https://i.juan.is
 Environment=PICKR_PURGE_URL=http://127.0.0.1:8081
-ExecStart=/usr/bin/node --no-warnings=ExperimentalWarning server/index.js
+# glibc's per-thread arenas otherwise let a sharp process creep toward MemoryMax over days
+Environment=MALLOC_ARENA_MAX=2
+ExecStart=/usr/bin/node --disable-warning=ExperimentalWarning server/index.js
 Restart=on-failure
 RestartSec=2
 MemoryMax=300M

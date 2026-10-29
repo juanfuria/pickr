@@ -7,8 +7,8 @@
   "engines": { "node": ">=22.13" },
   "bin": { "pickr": "bin/pickr.js", "pickr-admin": "bin/pickr-admin.js" },
   "scripts": {
-    "start": "node --no-warnings=ExperimentalWarning server/index.js",
-    "test": "node --test --no-warnings=ExperimentalWarning 'test/**/*.test.js'",
+    "start": "node --disable-warning=ExperimentalWarning server/index.js",
+    "test": "node --test --disable-warning=ExperimentalWarning 'test/**/*.test.js'",
     "fixtures": "bash test/fixtures/make.sh"
   },
   "dependencies": {

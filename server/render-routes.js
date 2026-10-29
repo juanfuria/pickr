@@ -24,9 +24,13 @@ function renderError(e, message) {
   return err;
 }
 
-export default async function renderRoutes(app, { db, root, renderLimiter = createLimiter({ concurrency: 2, queue: 32 }) }) {
+export default async function renderRoutes(app, { db, root, renderLimiter = createLimiter({ concurrency: 1, queue: 32 }) }) {
   // Cache misses are free to manufacture from the open internet; the limiter bounds what they can cost the box.
-  const limited = fn => renderLimiter.run(fn);
+  const limited = (req, fn) => renderLimiter.run(() => {
+    // the client may have left while this waited in the queue: do not spend the box on nobody
+    if (req.raw.socket?.destroyed === true) throw httpError(499, 'client closed the request');
+    return fn();
+  });
 
   app.get('/_render/:name', async (req, reply) => {
     const parsed = splitName(req.params.name);
@@ -38,6 +42,8 @@ export default async function renderRoutes(app, { db, root, renderLimiter = crea
     // When the answer is the original, send the client to nginx's static copy instead of streaming the whole file
     // through Node and into the cache under a junk query. Short-lived: a later version may give that query a meaning.
     const original = () => reply.header('Cache-Control', 'public, max-age=86400').redirect(`/${row.id}.${row.ext}`, 302);
+    // A render can outlive a DELETE: its purge has already run, so output for a file that is gone must never be cached.
+    const stillLive = () => { if (!getLiveFile(db, row.id)) throw httpError(404, 'not found'); };
     reply.header('Cache-Control', IMMUTABLE);
 
     const q = req.query;
@@ -52,20 +58,26 @@ export default async function renderRoutes(app, { db, root, renderLimiter = crea
       // sharp's prebuilt libvips reads HEIC metadata but cannot decode its HEVC pixels: the original, no attempt.
       if (!ip.active || UNRENDERABLE.has(row.mime)) return original();
       let out;
-      try { out = await limited(() => renderImage(src, ip)); } catch (e) { throw renderError(e, 'cannot render this image'); }
+      try { out = await limited(req, () => renderImage(src, ip)); } catch (e) { throw renderError(e, 'cannot render this image'); }
+      stillLive();
       return reply.type(out.mime).send(out.body);
     }
 
     if (row.kind === 'video') {
       const vp = parseVideoParams(q);
       if (!vp.active && !ip.active) return original();
-      const t = Math.min(vp.t, Math.max(0, (row.duration ?? 0) - 0.1));
+      // An unknown duration clamps nothing: a time past the end finds no frame, which is already a 422.
+      const t = row.duration ? Math.min(vp.t, Math.max(0, row.duration - 0.1)) : vp.t;
       let jpeg;
-      try { jpeg = await limited(() => posterFrame(src, t)); } catch (e) { throw renderError(e, 'cannot extract a frame'); }
+      try { jpeg = await limited(req, () => posterFrame(src, t)); } catch (e) { throw renderError(e, 'cannot extract a frame'); }
       if (!jpeg.length) throw httpError(422, 'no frame at that time');
-      if (!ip.active) return reply.type('image/jpeg').send(jpeg);
+      if (!ip.active) {
+        stillLive();
+        return reply.type('image/jpeg').send(jpeg);
+      }
       let out;
-      try { out = await limited(() => renderImage(jpeg, ip)); } catch (e) { throw renderError(e, 'cannot render this frame'); }
+      try { out = await limited(req, () => renderImage(jpeg, ip)); } catch (e) { throw renderError(e, 'cannot render this frame'); }
+      stillLive();
       return reply.type(out.mime).send(out.body);
     }
 

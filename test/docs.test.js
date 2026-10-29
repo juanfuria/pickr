@@ -40,6 +40,8 @@ test('nginx rewrites and the app agree on the render prefix', async () => {
   assert.match(install, /if ! nginx -t; then\n\s+rollback/, 'a config nginx rejects is rolled back');
   const unit = await readFile(join(ROOT, 'deploy', 'systemd', 'pickr.service'), 'utf8');
   assert.match(unit, /^UMask=0077$/m, 'the database and trash are private to the service');
+  assert.match(unit, /^Environment=MALLOC_ARENA_MAX=2$/m);
   const http = await readFile(join(ROOT, 'deploy', 'nginx', 'pickr.conf'), 'utf8');
   assert.match(http, /svg\|html\?/, 'HTML is sandboxed like SVG');
+  assert.match(http, /max_size=1g/);
 });

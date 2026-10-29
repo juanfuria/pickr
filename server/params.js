@@ -9,6 +9,13 @@ function int(v, min, max) {
   return Math.min(max, Math.max(min, n));
 }
 
+function num(v, min, max) {
+  if (v === undefined || v === null) return null;
+  const n = Number.parseFloat(String(v));
+  if (!Number.isFinite(n)) return null;
+  return Math.min(max, Math.max(min, n));
+}
+
 export function parseImageParams(query = {}) {
   const w = int(query.w, 1, MAX_EDGE);
   const h = int(query.h, 1, MAX_EDGE);
@@ -16,9 +23,9 @@ export function parseImageParams(query = {}) {
   const fmKey = String(query.fm ?? '').toLowerCase();
   const fm = Object.hasOwn(FORMATS, fmKey) ? FORMATS[fmKey] : null;
   const q = int(query.q, 1, 100) ?? 80;
-  const dpr = int(query.dpr, 1, 3) ?? 1;
+  const dpr = num(query.dpr, 1, 3) ?? 1;
   const up = query.up === '1';
-  const active = w !== null || h !== null || fm !== null || int(query.q, 1, 100) !== null || int(query.dpr, 1, 3) !== null;
+  const active = w !== null || h !== null || fm !== null || int(query.q, 1, 100) !== null || num(query.dpr, 1, 3) !== null;
   return { w, h, fit, fm, q, dpr, up, active };
 }
 

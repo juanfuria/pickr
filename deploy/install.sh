@@ -69,7 +69,7 @@ systemctl --no-pager --lines=5 status pickr
 if ! grep -q 'listen 443' /etc/nginx/sites-available/i.juan.is.conf; then
   certbot --nginx -d i.juan.is --non-interactive --agree-tos --register-unsafely-without-email --redirect
 fi
-ADMIN='runuser -u pickr -- node --no-warnings=ExperimentalWarning /opt/pickr/bin/pickr-admin.js'
+ADMIN='runuser -u pickr -- node --disable-warning=ExperimentalWarning /opt/pickr/bin/pickr-admin.js'
 echo "pickr installed. Next, as root:"
 echo "  $ADMIN account add juan"
 echo "  $ADMIN key add juan laptop"

@@ -13,7 +13,7 @@ import { trashPath } from '../server/store.js';
 
 const run = promisify(execFile);
 const BIN = join(dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'pickr-admin.js');
-const admin = (root, args, env = {}) => run(process.execPath, ['--no-warnings=ExperimentalWarning', BIN, ...args], { env: { ...process.env, PICKR_ROOT: root, PICKR_PURGE_URL: 'http://127.0.0.1:1', ...env } });
+const admin = (root, args, env = {}) => run(process.execPath, ['--disable-warning=ExperimentalWarning', BIN, ...args], { env: { ...process.env, PICKR_ROOT: root, PICKR_PURGE_URL: 'http://127.0.0.1:1', ...env } });
 
 test('accounts and keys', async () => {
   const { root, db, cleanup } = await makeRoot();

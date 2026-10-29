@@ -147,3 +147,17 @@ test('files: dl=1 with a hostile name, svg headers', async () => {
   assert.equal(raster.headers['content-type'], 'image/png');
   await cleanup();
 });
+
+test('a render that finishes after its file was deleted is a 404, so nothing is cached', async () => {
+  let id;
+  const { markDeleted } = await import('../server/repo.js');
+  let db;
+  const deleting = { run: async fn => { const out = await fn(); markDeleted(db, id); return out; } };
+  const ctx = await makeApp({ renderLimiter: deleting });
+  db = ctx.db;
+  id = (await put(ctx.app, ctx.key, 'photo.jpg')).id;
+  const r = await get(ctx.app, `/_render/${id}.jpg?w=10`);
+  assert.equal(r.statusCode, 404);
+  assert.equal(r.headers['cache-control'], 'no-store');
+  await ctx.cleanup();
+});

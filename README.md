@@ -7,7 +7,7 @@ An imgix-style file host for `i.juan.is`: originals served by nginx, images resi
     npm install
     npm run fixtures        # once; needs exiftool, ffmpeg, sips (macOS)
     npm test
-    PICKR_ROOT=/tmp/pickr-dev node --no-warnings=ExperimentalWarning server/index.js
+    PICKR_ROOT=/tmp/pickr-dev node --disable-warning=ExperimentalWarning server/index.js
 
 ## Deploy
 

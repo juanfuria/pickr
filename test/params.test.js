@@ -19,6 +19,8 @@ test('values are parsed, clamped and normalised', () => {
   assert.equal(parseImageParams({ fm: 'constructor' }).fm, null, 'inherited names are not formats');
   assert.equal(parseImageParams({ fm: '__proto__' }).active, false);
   assert.equal(parseImageParams({ up: 'yes' }).up, false);
+  assert.equal(parseImageParams({ dpr: '1.5' }).dpr, 1.5);
+  assert.equal(parseImageParams({ dpr: '1.5' }).active, true);
 });
 
 test('unknown parameters are ignored and leave the request inactive', () => {

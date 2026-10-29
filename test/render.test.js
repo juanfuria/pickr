@@ -32,6 +32,22 @@ test('width, height, fit, dpr, no upscaling, up=1, cap', async () => {
   assert.equal(th, 4096);
 });
 
+test('per-format edge caps bound the encoders', async () => {
+  const src = fixture('big.jpg'); // 5000x3000
+  const a = await renderImage(src, P({ w: '4096', fm: 'avif' }));
+  assert.deepEqual((await dims(a.body)).slice(0, 2), [1600, 960]);
+  const wb = await renderImage(src, P({ w: '4096', fm: 'webp' }));
+  assert.deepEqual((await dims(wb.body)).slice(0, 2), [2560, 1536]);
+  const j = await renderImage(src, P({ w: '4096', fm: 'jpg' }));
+  assert.deepEqual((await dims(j.body)).slice(0, 2), [4096, 2458]);
+});
+
+test('fractional dpr and capped animation frames', async () => {
+  assert.equal((await dims((await renderImage(fixture('photo.jpg'), P({ w: '100', dpr: '1.5' }))).body))[0], 150);
+  const capped = await renderImage(fixture('animated.gif'), P({ w: '60' }), { maxFramePixels: 120 * 90 * 2 });
+  assert.equal((await dims(capped.body))[3], 2);
+});
+
 test('formats, quality and mime', async () => {
   const src = fixture('photo.jpg');
   for (const [fm, format, mime] of [['webp', 'webp', 'image/webp'], ['png', 'png', 'image/png'], ['avif', 'heif', 'image/avif'], ['jpg', 'jpeg', 'image/jpeg']]) {

@@ -6,6 +6,8 @@ import { ensureLayout } from './store.js';
 import { buildApp } from './app.js';
 
 sharp.concurrency(1);
+// no libvips operation cache: memory stays proportional to the render in flight
+sharp.cache(false);
 
 await ensureLayout(config.root);
 const db = openDb(join(config.root, 'pickr.sqlite'));
