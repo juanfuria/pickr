@@ -35,7 +35,7 @@ export async function restoreFromTrash(root, id, ext) {
 
 const DAY = 86_400_000;
 
-export async function sweep({ db, root, now = new Date(), trashDays = 30, purge = async () => {} }) {
+export async function sweep({ db, root, now = new Date(), trashDays = 30, purge = async () => true }) {
   const cutoff = new Date(now.getTime() - trashDays * DAY).toISOString();
   let removed = 0;
   let purgeFailed = 0;

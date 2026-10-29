@@ -67,6 +67,17 @@ test('sweep removes old trash rows and files, purges, and clears stale tmp', asy
   await cleanup();
 });
 
+test('sweep with no purge function counts no failed purges', async () => {
+  const { root, db, cleanup } = await makeRoot();
+  const a = createAccount(db, 'juan');
+  insertFile(db, row('old0000000000', a.id));
+  await writeFile(trashPath(root, 'old0000000000', 'txt'), 'x');
+  markDeleted(db, 'old0000000000', '2026-01-01T00:00:00.000Z');
+  const r = await sweep({ db, root, now: new Date('2026-03-01T00:00:00.000Z'), trashDays: 30 });
+  assert.deepEqual([r.removed, r.purgeFailed], [1, 0]);
+  await cleanup();
+});
+
 test('sweep never removes a row that was restored after it was listed', async () => {
   const { root, db, cleanup } = await makeRoot();
   const a = createAccount(db, 'juan');
