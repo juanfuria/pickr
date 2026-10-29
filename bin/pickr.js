@@ -15,13 +15,27 @@ const [cmd, ...rest] = positional;
 
 const die = msg => { console.error(msg); process.exit(1); };
 
+// A key is pk_ plus base64url; anything else is a typo or swapped arguments, and must never be sent or echoed.
+const KEY_RE = /^pk_[A-Za-z0-9_-]{16,}$/;
+
+// https only, except plain http to this machine; no credentials, query or fragment. Returns the URL without a trailing
+// slash, or null.
+function checkUrl(raw) {
+  let u;
+  try { u = new URL(raw); } catch { return null; }
+  const loopback = ['127.0.0.1', 'localhost', '[::1]'].includes(u.hostname);
+  if (u.username || u.password || u.search || u.hash) return null;
+  if (u.protocol !== 'https:' && !(u.protocol === 'http:' && loopback)) return null;
+  return u.href.replace(/\/+$/, '');
+}
+
 async function loadConfig() {
   try {
     const c = JSON.parse(await readFile(CONFIG, 'utf8'));
-    if (!c.url || !c.key) throw new Error();
+    if (!checkUrl(c.url ?? '') || !KEY_RE.test(c.key ?? '')) throw new Error();
     return c;
   } catch {
-    die(`no config at ${CONFIG}; run: pickr init https://i.juan.is pk_…`);
+    die(`no usable config at ${CONFIG}; run: pickr init https://i.juan.is pk_…`);
   }
 }
 
@@ -45,11 +59,16 @@ const line = f => `${f.id}  ${f.kind.padEnd(5)}  ${fmtBytes(f.bytes).padStart(6)
 
 const commands = {
   async init() {
-    const [url, key] = rest;
-    if (!url || !key) die('usage: pickr init URL KEY');
+    const [rawUrl, key] = rest;
+    if (!rawUrl || !key) die('usage: pickr init URL KEY');
+    const url = checkUrl(rawUrl);
+    // neither message echoes what was typed: with swapped arguments, that would be the key
+    if (!url) die('the URL must be https:// (plain http only for localhost), with no credentials; the order is pickr init URL KEY');
+    if (!KEY_RE.test(key)) die('that is not a pickr key (pk_ followed by letters, digits, _ or -); the order is pickr init URL KEY');
     await mkdir(dirname(CONFIG), { recursive: true, mode: 0o700 });
-    await writeFile(CONFIG, JSON.stringify({ url: url.replace(/\/+$/, ''), key }) + '\n', { mode: 0o600 });
-    await chmod(CONFIG, 0o600); // writeFile's mode applies only on creation; an existing loose file must be tightened
+    // tighten an existing file before the key goes into it (writeFile's mode applies only on creation)
+    await chmod(CONFIG, 0o600).catch(e => { if (e.code !== 'ENOENT') throw e; });
+    await writeFile(CONFIG, JSON.stringify({ url, key }) + '\n', { mode: 0o600 });
     console.log(`config written to ${CONFIG}`);
   },
   async up() {
@@ -97,6 +116,7 @@ if (!Object.hasOwn(commands, cmd ?? '')) die('usage: pickr <init|up|ls|rm|restor
 try {
   await commands[cmd]();
 } catch (e) {
-  // one line, never a stack: "fetch failed: connect ECONNREFUSED …" or "ENOENT: no such file or directory, …"
-  die(e?.cause?.message ? `${e.message}: ${e.cause.message}` : String(e?.message ?? e));
+  // one line, never a stack, never a key: "fetch failed: connect ECONNREFUSED …" or "ENOENT: no such file …"
+  const msg = e?.cause?.message ? `${e.message}: ${e.cause.message}` : String(e?.message ?? e);
+  die(msg.replace(/pk_[A-Za-z0-9_-]+/g, 'pk_…').split('\n')[0]);
 }

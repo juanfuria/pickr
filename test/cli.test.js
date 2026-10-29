@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { readFile, stat, chmod } from 'node:fs/promises';
+import { readFile, writeFile, stat, chmod } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { makeApp, fixture } from './helpers.js';
@@ -16,7 +16,18 @@ test('init, up, ls, rm, restore, keys, me', async t => {
   t.after(cleanup); // a failing assertion must not leave the server running, or the run hangs instead of failing
   const url = `http://127.0.0.1:${app.server.address().port}`;
   const cfg = join(root, 'cli.json');
-  const cli = (...args) => run(process.execPath, [BIN, ...args], { env: { ...process.env, PICKR_CONFIG: cfg, PATH: '/nonexistent' } });
+  // every call, success or failure, is checked: the key never appears in stdout or stderr
+  const cli = async (...args) => {
+    let r;
+    try {
+      r = await run(process.execPath, [BIN, ...args], { env: { ...process.env, PICKR_CONFIG: cfg, PATH: '/nonexistent' } });
+    } catch (e) {
+      assert.ok(!`${e.stdout}${e.stderr}`.includes(key), `the key was printed by: pickr ${args[0]}`);
+      throw e;
+    }
+    assert.ok(!`${r.stdout}${r.stderr}`.includes(key), `the key was printed by: pickr ${args[0]}`);
+    return r;
+  };
 
   await cli('init', url, key);
   assert.equal(((await stat(cfg)).mode & 0o777), 0o600);
@@ -25,6 +36,13 @@ test('init, up, ls, rm, restore, keys, me', async t => {
   await cli('init', url, key);
   assert.equal(((await stat(cfg)).mode & 0o777), 0o600, 're-running init tightens an existing config');
   await assert.rejects(cli('up', join(root, 'missing.jpg')), e => e.code === 1 && /ENOENT/.test(e.stderr) && !/\n\s+at /.test(e.stderr), 'one line, no stack');
+  await assert.rejects(cli('init', key, url), e => e.code === 1 && /pickr init URL KEY/.test(e.stderr), 'swapped arguments are refused');
+  await assert.rejects(cli('init', 'http://example.com', key), e => e.code === 1, 'plain http only for this machine');
+  await assert.rejects(cli('init', url, 'pk_short'), e => e.code === 1, 'a malformed key is refused');
+  assert.deepEqual(JSON.parse(await readFile(cfg, 'utf8')), { url, key }, 'a refused init leaves the config alone');
+  await writeFile(cfg, JSON.stringify({ url: key, key: url }));
+  await assert.rejects(cli('me'), e => e.code === 1 && /no usable config/.test(e.stderr), 'a swapped hand-edited config is refused');
+  await cli('init', url, key);
 
   const up = await cli('up', fixture('alpha.png'), fixture('doc.pdf'));
   const urls = up.stdout.trim().split('\n');
