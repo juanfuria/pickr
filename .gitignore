@@ -3,3 +3,4 @@ node_modules/
 *.sqlite-*
 /tmp/
 .DS_Store
+.npm/

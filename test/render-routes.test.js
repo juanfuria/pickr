@@ -67,7 +67,7 @@ test('a corrupt image is a 422; an image sharp cannot read (heic) falls back to 
   await cleanup();
 });
 
-test('video: poster frame with t, composable, clamped; plain query serves the original', async () => {
+test('video: poster frame with t, composable, clamped; a plain query redirects to the original', async () => {
   const { app, key, cleanup } = await makeApp();
   const v = await put(app, key, 'clip.mp4');
   const poster = await get(app, `/_render/${v.id}.mp4?t=1`);

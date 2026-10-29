@@ -16,7 +16,8 @@ ExecStart=/usr/bin/node --no-warnings=ExperimentalWarning server/index.js
 Restart=on-failure
 RestartSec=2
 MemoryMax=300M
-UMask=0027
+# private by default; ingest gives originals 0640 explicitly so nginx (group pickr) can read files/ and nothing else
+UMask=0077
 NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectSystem=strict

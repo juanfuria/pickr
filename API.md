@@ -1,6 +1,6 @@
 # pickr API
 
-Base URL `https://i.juan.is`. Every `/api/` request needs `Authorization: Bearer <key>`. Keys look like `pk_…`; ask Juan for one. Errors are JSON `{"error": "…"}` with a normal HTTP status. A file that is not yours is a 404.
+Base URL `https://i.juan.is`. Every `/api/` request needs `Authorization: Bearer <key>`. Keys look like `pk_…`; ask Juan for one. Errors are JSON `{"error": "…"}` with a normal HTTP status, except nginx's own refusals (413 too large, 429 too many requests, 502 or 504 when the service is down), which are plain HTML pages. A file that is not yours is a 404.
 
 ## Upload
 
