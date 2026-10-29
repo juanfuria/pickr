@@ -182,3 +182,17 @@ test('chooseExt keeps a hint only when it names the same format', () => {
   assert.equal(chooseExt('mp4', null), 'mp4');
   assert.equal(chooseExt('bin', 'html'), 'bin');
 });
+
+test('a MOV is stored as a MOV with no personal tag left', async () => {
+  const { root, db, cleanup } = await makeRoot();
+  const a = createAccount(db, 'juan');
+  const mov = newTmpPath(root);
+  await promisify(execFile)('ffmpeg', ['-y', '-v', 'error', '-i', fixture('clip.mp4'), '-c', 'copy', '-f', 'mov', mov]);
+  const { file } = await ingest({ db, root, tmpPath: mov, accountId: a.id });
+  assert.equal(file.kind, 'video');
+  assert.equal(file.ext, 'mov');
+  assert.equal(file.mime, 'video/quicktime');
+  const { personalTags, readMeta } = await import('../server/metadata.js');
+  assert.deepEqual(personalTags((await readMeta(filePath(root, file.id, file.ext))).meta), []);
+  await cleanup();
+});

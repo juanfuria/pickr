@@ -92,7 +92,8 @@ export async function stripVideo(path, ext = extname(path).slice(1)) {
   const out = `${path}.strip.${ext}`;
   try {
     // 0:V (capital) selects real video streams only: attached pictures (cover art) are JPEGs with their own EXIF and must not be copied.
-    await run('ffmpeg', ['-y', '-v', 'error', '-i', path, '-map', '0:V', '-map', '0:a?', '-map_metadata', '-1', '-map_chapters', '-1', '-c', 'copy', '-movflags', '+faststart', out], BIG);
+    // +bitexact: libavformat writes no encoder stamp ("Lavf…"), which the post-strip check would otherwise refuse
+    await run('ffmpeg', ['-y', '-v', 'error', '-i', path, '-map', '0:V', '-map', '0:a?', '-map_metadata', '-1', '-map_chapters', '-1', '-c', 'copy', '-movflags', '+faststart', '-fflags', '+bitexact', out], BIG);
     await rename(out, path);
   } catch (e) {
     await rm(out, { force: true }); // ffmpeg creates the output before it can fail at the header; never leave it behind

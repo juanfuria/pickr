@@ -122,6 +122,17 @@ test('stripVideo drops container metadata and keeps streams and duration', async
   await done();
 });
 
+test('stripVideo leaves no encoder stamp in a MOV', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'pickr-meta-'));
+  const p = join(dir, 'clip.mov');
+  await run('ffmpeg', ['-y', '-v', 'error', '-i', fixture('clip.mp4'), '-c', 'copy', p]);
+  await stripVideo(p, 'mov');
+  const after = await readMeta(p);
+  assert.deepEqual(personalTags(after.meta), []);
+  assert.equal(after.mime, 'video/quicktime');
+  await rm(dir, { recursive: true, force: true });
+});
+
 test('stripVideo leaves nothing behind when ffmpeg cannot write the container', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'pickr-meta-'));
   const p = join(dir, 'clip');
