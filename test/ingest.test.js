@@ -132,3 +132,13 @@ test('legacy import honours id, createdAt and original_name', async () => {
   await stat(filePath(root, 'pickr_0114fd6c', 'jpg'));
   await cleanup();
 });
+
+test('a TIFF is stored with no personal tag left', async () => {
+  const { root, db, cleanup } = await makeRoot();
+  const a = createAccount(db, 'juan');
+  const { file } = await ingest({ db, root, tmpPath: await staged(root, 'tagged.tif'), accountId: a.id });
+  assert.equal(file.meta['EXIF:Make'], 'TestCam', 'the metadata is kept in the row');
+  const { personalTags, readMeta } = await import('../server/metadata.js');
+  assert.deepEqual(personalTags((await readMeta(filePath(root, file.id, file.ext))).meta), []);
+  await cleanup();
+});

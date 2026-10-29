@@ -24,6 +24,11 @@ ffmpeg -y -v error -f lavfi -i testsrc=size=320x240:rate=10 -f lavfi -i sine=fre
   clip.mp4
 
 ffmpeg -y -v error -f lavfi -i color=c=red:s=16x16 -frames:v 1 bitmap.bmp
+# a TIFF whose IFD0 carries personal tags: exiftool's -all= alone cannot remove them
+node --input-type=module -e "import sharp from 'sharp'; await sharp('photo.jpg').tiff().toFile('tagged.tif')"
+exiftool -overwrite_original -q -Make=TestCam -Model=T1 -Artist='Fixture Person' -Copyright='Fixture Person' \
+  -HostComputer=fixture-mac -DocumentName=/Users/fixture/secret.tif -ImageDescription='a private note' \
+  -Software=FixtureSoft '-XPAuthor=Fixture Person' '-XPComment=private' tagged.tif
 # the same clip with photo.jpg (GPS, camera) attached as cover art: a video strip must drop the picture, not copy it
 ffmpeg -y -v error -i clip.mp4 -i photo.jpg -map 0 -map 1 -c copy -disposition:v:1 attached_pic cover.mp4
 

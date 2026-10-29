@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { chmod, rename, stat, unlink } from 'node:fs/promises';
 import { pipeline } from 'node:stream/promises';
-import { readMeta, kindFromMime, stripImage, stripVideo } from './metadata.js';
+import { readMeta, kindFromMime, stripImage, stripVideo, personalTags } from './metadata.js';
 import { measureImage, measureVideo } from './measure.js';
 import { newId, isValidId } from './ids.js';
 import { filePath } from './store.js';
@@ -28,11 +28,18 @@ export async function ingest({ db, root, tmpPath, accountId, originalName = null
     // content type (an unknown blob called x.html must not be served as text/html).
     const ext = info.ext ?? 'bin';
 
-    if (kind === 'image' && info.mime !== 'image/svg+xml') {
-      try { await stripImage(tmpPath); } catch (e) { throw failed('cannot strip metadata from this image', e, tmpPath); }
-    }
-    if (kind === 'video') {
-      try { await stripVideo(tmpPath, ext); } catch (e) { throw failed('cannot strip metadata from this video', e, tmpPath); }
+    let mime = info.mime;
+    if (kind === 'video' || (kind === 'image' && info.mime !== 'image/svg+xml')) {
+      const what = kind === 'video' ? 'video' : 'image';
+      try {
+        if (kind === 'video') await stripVideo(tmpPath, ext); else await stripImage(tmpPath);
+      } catch (e) { throw failed(`cannot strip metadata from this ${what}`, e, tmpPath); }
+      // Fail closed: whatever the format, nothing personal may reach disk.
+      let after;
+      try { after = await readMeta(tmpPath); } catch (e) { throw failed(`cannot strip metadata from this ${what}`, e, tmpPath); }
+      const left = personalTags(after.meta);
+      if (left.length) throw failed(`cannot strip metadata from this ${what}`, new Error(`Error: kept ${left.join(', ')}`), tmpPath);
+      mime = after.mime;
     }
 
     const sha256 = await sha256File(tmpPath);
@@ -53,7 +60,7 @@ export async function ingest({ db, root, tmpPath, accountId, originalName = null
     const fileId = id ?? newId();
     const bytes = (await stat(tmpPath)).size;
     const row = insertFile(db, {
-      id: fileId, accountId, kind, mime: info.mime, ext, bytes, sha256, width, height, duration,
+      id: fileId, accountId, kind, mime, ext, bytes, sha256, width, height, duration,
       originalName: originalName ?? null, takenAt: info.takenAt, meta: info.meta, createdAt: createdAt ?? now(),
     });
     try {

@@ -28,6 +28,18 @@ export async function readMeta(path) {
   return { meta, mime, ext, takenAt: takenAtFrom(meta) };
 }
 
+// Tag names, in any exiftool group, that must never survive a strip. Two survivors are not personal: the ICC profile
+// (kept on purpose; its header names a creator and a copyright) and the mandatory MP4 header dates ffmpeg can only zero.
+const PERSONAL = /GPS|Location|Make$|Model$|Serial|Artist|Owner|Creator|DateTimeOriginal|CreateDate|ModifyDate|Software|HostComputer|DocumentName|Copyright|ImageDescription|UserComment|ImageUniqueID/i;
+const ZEROED_DATE = /^QuickTime:(Track|Media)?(Create|Modify)Date$/;
+
+export function personalTags(meta) {
+  return Object.keys(meta).filter(k =>
+    (PERSONAL.test(k) || /:XP/.test(k)) &&
+    !k.startsWith('ICC_Profile:') &&
+    !(ZEROED_DATE.test(k) && meta[k] === '0000:00:00 00:00:00'));
+}
+
 export function kindFromMime(mime) {
   if (typeof mime !== 'string') return 'file';
   if (mime.startsWith('image/')) return 'image';
@@ -64,8 +76,13 @@ export function takenAtFrom(meta) {
 
 // Lossless: exiftool rewrites metadata segments only. The ICC profile and the orientation flag are copied back
 // because they change how the pixels are displayed and carry nothing personal.
+// -all= cannot delete IFD0 in a TIFF (or a TIFF-based RAW): its personal tags are removed one by one, and ingest
+// re-reads the result and refuses anything that still carries a personal tag.
 export async function stripImage(path) {
-  await run('exiftool', ['-all=', '-tagsfromfile', '@', '-ICC_Profile', '-Orientation', '-overwrite_original', '-q', '-api', 'largefilesupport=1', path], BIG);
+  await run('exiftool', ['-all=', '-tagsfromfile', '@', '-ICC_Profile', '-Orientation',
+    '-IFD0:Make=', '-IFD0:Model=', '-IFD0:Artist=', '-IFD0:Copyright=', '-IFD0:HostComputer=', '-IFD0:DocumentName=',
+    '-IFD0:ImageDescription=', '-IFD0:Software=', '-IFD0:ModifyDate=', '-IFD0:XP*=',
+    '-overwrite_original', '-q', '-api', 'largefilesupport=1', path], BIG);
 }
 
 // Lossless: streams are copied, container and stream metadata and chapters dropped. Real video and audio only, so

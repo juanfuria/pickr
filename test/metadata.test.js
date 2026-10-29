@@ -9,16 +9,8 @@ import sharp from 'sharp';
 import { fixture, exif } from './helpers.js';
 
 const run = promisify(execFile);
-import { readMeta, kindFromMime, takenAtFrom, stripImage, stripVideo } from '../server/metadata.js';
+import { readMeta, kindFromMime, takenAtFrom, stripImage, stripVideo, personalTags } from '../server/metadata.js';
 import { measureVideo } from '../server/measure.js';
-
-// Tag names, in any exiftool group, that must never survive a strip, minus two structural survivors that match the
-// pattern but carry nothing personal: the colour profile's header constant (we keep the ICC profile on purpose) and the
-// mandatory MP4 header dates, which ffmpeg can only zero, never remove.
-const PERSONAL = /GPS|Location|Make$|Model$|Serial|Artist|Owner|DateTimeOriginal|CreateDate|Software/i;
-const STRUCTURAL = new Set(['ICC_Profile:DeviceModel']);
-const ZEROED = /^QuickTime:(Track|Media)?CreateDate$/;
-const personal = m => Object.keys(m).filter(k => PERSONAL.test(k) && !STRUCTURAL.has(k) && !(ZEROED.test(k) && m[k] === '0000:00:00 00:00:00'));
 
 async function scratch(name) {
   const dir = await mkdtemp(join(tmpdir(), 'pickr-meta-'));
@@ -80,7 +72,7 @@ test('stripImage removes everything but ICC and orientation and keeps pixels byt
   assert.equal(m['EXIF:Make'], undefined);
   assert.equal(m['EXIF:DateTimeOriginal'], undefined);
   assert.equal(m['EXIF:Artist'], undefined);
-  assert.deepEqual(personal(m), [], 'no personal tag in any group');
+  assert.deepEqual(personalTags((await readMeta(p)).meta), [], 'no personal tag in any group');
   assert.equal(m['EXIF:Orientation'], 6);
   assert.match(String(m['ICC_Profile:ProfileDescription'] ?? ''), /P3/i);
   const after = await sharp(p).raw().toBuffer();
@@ -95,12 +87,26 @@ test('stripImage works on png and heic, rejects bmp', async () => {
     const m = await exif(p);
     assert.equal(m['EXIF:GPSLatitude'], undefined, n);
     assert.equal(m['EXIF:Make'], undefined, n);
-    assert.deepEqual(personal(m), [], `${n}: no personal tag in any group`);
+    assert.deepEqual(personalTags((await readMeta(p)).meta), [], `${n}: no personal tag in any group`);
     await done();
   }
   const { p, done } = await scratch('bitmap.bmp');
   await assert.rejects(stripImage(p));
   await done();
+});
+
+test('stripImage removes IFD0 personal tags from a TIFF', async () => {
+  const { p, done } = await scratch('tagged.tif');
+  assert.ok(personalTags((await readMeta(p)).meta).length > 0, 'the fixture carries personal tags');
+  await stripImage(p);
+  assert.deepEqual(personalTags((await readMeta(p)).meta), []);
+  await done();
+});
+
+test('personalTags flags what must not survive and spares the two structural survivors', () => {
+  assert.deepEqual(personalTags({ 'IFD0:Make': 'X', 'EXIF:XPAuthor': 'Y', 'IFD0:DocumentName': '/Users/a' }), ['IFD0:Make', 'EXIF:XPAuthor', 'IFD0:DocumentName']);
+  assert.deepEqual(personalTags({ 'ICC_Profile:ProfileCopyright': 'Apple', 'ICC_Profile:DeviceModel': 'ctrl', 'QuickTime:CreateDate': '0000:00:00 00:00:00' }), []);
+  assert.deepEqual(personalTags({ 'QuickTime:CreateDate': '2024:05:03 10:11:12' }), ['QuickTime:CreateDate']);
 });
 
 test('stripVideo drops container metadata and keeps streams and duration', async () => {
@@ -109,7 +115,7 @@ test('stripVideo drops container metadata and keeps streams and duration', async
   await stripVideo(p);
   const m = await exif(p);
   assert.equal(m['QuickTime:Title'], undefined);
-  assert.deepEqual(personal(m), []);
+  assert.deepEqual(personalTags((await readMeta(p)).meta), []);
   const after = await measureVideo(p);
   assert.equal(after.width, 320);
   assert.ok(Math.abs(after.duration - before.duration) < 0.2);
@@ -137,8 +143,7 @@ test('stripVideo drops attached cover art, which carries its own EXIF', async ()
   const streams = await ffprobeStreams(p);
   assert.equal(streams.filter(s => s.codec_type === 'video').length, 1);
   assert.equal(streams.some(s => s.disposition?.attached_pic === 1), false, 'no attached picture after the strip');
-  const m = await exif(p);
-  assert.deepEqual(personal(m), []);
+  assert.deepEqual(personalTags((await readMeta(p)).meta), []);
   await done();
 });
 
