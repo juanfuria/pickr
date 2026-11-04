@@ -13,5 +13,10 @@ An imgix-style file host for `i.juan.is`: originals served by nginx, images resi
 
     deploy/install.sh       # once, on the box, as root
     deploy/deploy.sh        # from the Mac, every time
+    deploy/smoke.sh         # from the Mac, end to end against the live host
+
+After certbot, HSTS goes in by hand: `add_header Strict-Transport-Security "max-age=31536000" always;`
+in the 443 server block and again inside `location /` and `location /_render/`, whose own
+`add_header` lines shadow the server-level one.
 
 See `API.md` for the API.
