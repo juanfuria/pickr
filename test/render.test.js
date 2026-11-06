@@ -183,3 +183,13 @@ test('lego: a big ask stays inside the pixel budget; animations give their first
   assert.equal(gif.mime, 'image/gif');
   assert.equal((await dims(gif.body))[3], 1);
 });
+
+test('lego: under a format cap the bricks stay whole, never resampled', async () => {
+  const square = await solid(64, 64, '#f2cd37');
+  const avif = await renderImage(square, P({ lego: '96', fm: 'avif' }));
+  const [w, h] = await dims(avif.body);
+  assert.ok(w <= 1600 && h <= 1600, `${w}x${h}`);
+  assert.equal(w % 96, 0, `${w} is whole bricks`);
+  const webp = await renderImage(square, P({ lego: '96', w: '4096', fm: 'webp' }));
+  assert.equal((await dims(webp.body))[0] % 96, 0);
+});

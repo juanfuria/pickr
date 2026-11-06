@@ -37,15 +37,16 @@ function brickTile(size) {
 
 // The picture as N bricks along its long side: shrink to one pixel per brick, blow each pixel up into a square,
 // and lay the brick over every square. Returns raw upright pixels for the usual resize and encode to finish.
-async function legoPicture(input, p, meta) {
+async function legoPicture(input, p, meta, edge) {
   const swap = (meta.orientation ?? 1) >= 5;
   const fw = meta.width;
   const fh = meta.pageHeight ?? meta.height;
   const [W, H] = swap ? [fh, fw] : [fw, fh];
   const cols = W >= H ? p.lego : Math.max(1, Math.round((p.lego * W) / H));
   const rows = H > W ? p.lego : Math.max(1, Math.round((p.lego * H) / W));
-  const want = Math.max(p.w ? (p.w * p.dpr) / cols : 0, p.h ? (p.h * p.dpr) / rows : 0);
-  const fits = Math.min(Math.floor(MAX_EDGE / Math.max(cols, rows)), Math.floor(Math.sqrt(MAX_LEGO_PIXELS / (cols * rows))));
+  // built no bigger than the output can be: the format's edge caps it before the encoder would
+  const want = Math.max(p.w ? Math.min(p.w * p.dpr, edge) / cols : 0, p.h ? Math.min(p.h * p.dpr, edge) / rows : 0);
+  const fits = Math.min(Math.floor(edge / Math.max(cols, rows)), Math.floor(Math.sqrt(MAX_LEGO_PIXELS / (cols * rows))));
   const size = Math.max(1, Math.min(want ? Math.ceil(want) : BRICK, fits));
 
   const grid = await sharp(input, { failOn: 'error' }).timeout(TIMEOUT).rotate()
@@ -80,7 +81,7 @@ export async function renderImage(input, p, { maxEdge = MAX_EDGE, maxFramePixels
 
   let img;
   if (p.lego) {
-    const lego = await legoPicture(input, p, meta);
+    const lego = await legoPicture(input, p, meta, edge);
     img = sharp(lego.data, { raw: lego.raw }).timeout(TIMEOUT);
   } else {
     img = sharp(input, { pages: frames, failOn: 'error' }).rotate().timeout(TIMEOUT);
