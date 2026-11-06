@@ -20,6 +20,8 @@ merged into the live file by hand. HSTS is already in it (browsers ignore it ove
 inherited `add_header` lines in any block that sets its own, so a new location that adds headers repeats
 the HSTS line; `test/home.test.js` checks.
 
+On the pixelatedrobots box the live vhost also has `include snippets/shellbeach.conf;`, the box-wide 404 page; it lives with the box's own config, not here.
+
 The home page at `/` is `public/`: a playground for the URL grammar on one image, served by nginx straight
 from the checkout. The image is `data-file` on `<main>` in `public/index.html`.
 
