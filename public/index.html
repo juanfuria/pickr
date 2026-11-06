@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>i.juan.is</title>
+<meta name="description" content="A small file host. Every image on it can be resized, cropped and re-encoded by changing its address.">
+<meta name="color-scheme" content="light dark">
+<link rel="stylesheet" href="/_/home.css">
+<script type="module" src="/_/home.js"></script>
+</head>
+<body>
+<main class="page" data-file="EUnx84Bv9gAT.jpg" data-width="1613" data-height="2313">
+  <header class="intro">
+    <h1>i.juan.is</h1>
+    <p>A small file host. Every image on it can be resized, cropped and re-encoded by changing its address. Move something and watch the address change.</p>
+  </header>
+
+  <section class="stage" aria-label="Result">
+    <div class="address">
+      <a id="url" class="url" href="/EUnx84Bv9gAT.jpg" target="_blank" rel="noopener">i.juan.is/EUnx84Bv9gAT.jpg</a>
+      <button id="copy" type="button" class="button">Copy</button>
+    </div>
+    <div class="frame">
+      <div class="canvas" id="canvas" data-view="fit">
+        <img id="picture" alt="An ink drawing: a dense web of blue lines around a single red egg">
+      </div>
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+      <button id="view" type="button" class="button view" aria-pressed="false">Actual pixels</button>
+    </div>
+    <dl class="facts">
+      <div><dt>Weight</dt><dd id="f-bytes">–</dd></div>
+      <div><dt>Pixels</dt><dd id="f-size">–</dd></div>
+      <div><dt>Format</dt><dd id="f-type">–</dd></div>
+      <div><dt>Time</dt><dd id="f-time">–</dd></div>
+    </dl>
+    <p id="note" class="note" aria-live="polite"></p>
+  </section>
+
+  <form class="controls" id="controls" aria-label="Parameters">
+    <div class="control">
+      <div class="row">
+        <label class="check"><input type="checkbox" id="w-on" name="w-on" checked> Width</label>
+        <code class="param">w</code>
+        <output id="w-out" for="w"></output>
+      </div>
+      <input type="range" id="w" name="w" min="16" max="2400" step="8" value="800" aria-label="Width in pixels">
+    </div>
+
+    <div class="control">
+      <div class="row">
+        <label class="check"><input type="checkbox" id="h-on" name="h-on"> Height</label>
+        <code class="param">h</code>
+        <output id="h-out" for="h"></output>
+      </div>
+      <input type="range" id="h" name="h" min="16" max="2400" step="8" value="800" aria-label="Height in pixels">
+    </div>
+
+    <fieldset class="control" id="fit-set">
+      <legend>Fit <code class="param">fit</code></legend>
+      <div class="pills">
+        <label><input type="radio" name="fit" value="inside" checked><span>inside</span></label>
+        <label><input type="radio" name="fit" value="cover"><span>cover</span></label>
+        <label><input type="radio" name="fit" value="fill"><span>fill</span></label>
+      </div>
+      <p class="hint" id="fit-hint"></p>
+    </fieldset>
+
+    <fieldset class="control">
+      <legend>Format <code class="param">fm</code></legend>
+      <div class="pills">
+        <label><input type="radio" name="fm" value="" checked><span>as is</span></label>
+        <label><input type="radio" name="fm" value="jpg"><span>jpg</span></label>
+        <label><input type="radio" name="fm" value="webp"><span>webp</span></label>
+        <label><input type="radio" name="fm" value="avif"><span>avif</span></label>
+        <label><input type="radio" name="fm" value="png"><span>png</span></label>
+      </div>
+    </fieldset>
+
+    <div class="control">
+      <div class="row">
+        <label for="q">Quality</label>
+        <code class="param">q</code>
+        <output id="q-out" for="q"></output>
+      </div>
+      <input type="range" id="q" name="q" min="1" max="100" step="1" value="80">
+      <p class="hint" id="q-hint"></p>
+    </div>
+
+    <fieldset class="control">
+      <legend>Pixel density <code class="param">dpr</code></legend>
+      <div class="pills">
+        <label><input type="radio" name="dpr" value="1" checked><span>1×</span></label>
+        <label><input type="radio" name="dpr" value="1.5"><span>1.5×</span></label>
+        <label><input type="radio" name="dpr" value="2"><span>2×</span></label>
+        <label><input type="radio" name="dpr" value="3"><span>3×</span></label>
+      </div>
+    </fieldset>
+
+    <div class="control">
+      <div class="row">
+        <label class="check"><input type="checkbox" id="up" name="up"> Allow enlarging</label>
+        <code class="param">up</code>
+      </div>
+    </div>
+
+    <button type="reset" class="button reset" id="reset">Start again</button>
+  </form>
+
+  <footer class="foot">
+    <p>Uploads are for Juan and Marta. The <a href="https://github.com/juanfuria/pickr/blob/main/API.md">API</a> and the <a href="https://github.com/juanfuria/pickr">code</a> are public.</p>
+  </footer>
+</main>
+</body>
+</html>

@@ -15,8 +15,12 @@ An imgix-style file host for `i.juan.is`: originals served by nginx, images resi
     deploy/deploy.sh        # from the Mac, every time
     deploy/smoke.sh         # from the Mac, end to end against the live host
 
-After certbot, HSTS goes in by hand: `add_header Strict-Transport-Security "max-age=31536000" always;`
-in the 443 server block and again inside `location /` and `location /_render/`, whose own
-`add_header` lines shadow the server-level one.
+The vhost is copied once, because certbot edits it; later changes to `deploy/nginx/i.juan.is.conf` are
+merged into the live file by hand. HSTS is already in it (browsers ignore it over plain http). nginx drops
+inherited `add_header` lines in any block that sets its own, so a new location that adds headers repeats
+the HSTS line; `test/home.test.js` checks.
+
+The home page at `/` is `public/`: a playground for the URL grammar on one image, served by nginx straight
+from the checkout. The image is `data-file` on `<main>` in `public/index.html`.
 
 See `API.md` for the API.
