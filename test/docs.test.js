@@ -46,3 +46,9 @@ test('nginx rewrites and the app agree on the render prefix', async () => {
   assert.match(http, /svg\|html\?/, 'HTML is sandboxed like SVG');
   assert.match(http, /max_size=1g/);
 });
+
+test('originals can be read by canvases on other sites: CORS in location /', async () => {
+  const vhost = await readFile(join(ROOT, 'deploy', 'nginx', 'i.juan.is.conf'), 'utf8');
+  const originals = vhost.match(/^    location \/ \{[\s\S]*?\n    \}/m)[0];
+  assert.match(originals, /add_header Access-Control-Allow-Origin "\*";/);
+});
