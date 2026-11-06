@@ -73,3 +73,12 @@ test('nginx serves the home page with its own policy, and every location that se
     if (/add_header/.test(block)) assert.ok(block.includes(hsts), `HSTS missing in: ${block.split('\n')[0]}`);
   }
 });
+
+test('the welder works while a render is on its way, and stands still for reduced motion', async () => {
+  const html = await readFile(join(ROOT, 'public', 'index.html'), 'utf8');
+  const css = await readFile(join(ROOT, 'public', 'home.css'), 'utf8');
+  const welder = html.match(/<img class="welder" src="\/([^".]+)\.gif"/);
+  assert.ok(welder && isValidId(welder[1]), 'the welder is a pickr file on this host');
+  assert.match(html, /<source media="\(prefers-reduced-motion: reduce\)" srcset="\/[A-Za-z0-9]+\.png">\s*<img class="welder"/);
+  assert.match(css, /\.canvas\.busy ~ picture \.welder/, 'only on duty while rendering');
+});

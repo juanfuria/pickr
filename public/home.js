@@ -223,9 +223,11 @@ $('copy').addEventListener('click', async () => {
   setTimeout(() => { $('copy').textContent = 'Copy'; }, 1600);
 });
 
-originalBytes = await fetch(`/${FILE}`, { method: 'HEAD' })
-  .then((r) => Number(r.headers.get('content-length')) || null)
-  .catch(() => null);
+// The original's size makes the first render's "% of the original" possible, but never worth a stalled page.
+originalBytes = await Promise.race([
+  fetch(`/${FILE}`, { method: 'HEAD' }).then((r) => Number(r.headers.get('content-length')) || null).catch(() => null),
+  new Promise((resolve) => setTimeout(() => resolve(null), 1500)),
+]);
 
 if (location.hash.length > 1) writeForm(parseQuery(location.hash));
 state = { ...DEFAULTS, w: -1 }; // force the first paint
