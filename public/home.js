@@ -34,6 +34,7 @@ function readForm() {
     q: Number(f.q.value),
     dpr: Number(f.dpr.value),
     up: f.up.checked,
+    lego: f['lego-on'].checked ? Number(f.lego.value) : null,
   };
 }
 
@@ -48,6 +49,8 @@ function writeForm(s) {
   f.q.value = s.q;
   f.dpr.value = String(DPRS.reduce((a, b) => (Math.abs(b - s.dpr) < Math.abs(a - s.dpr) ? b : a)));
   f.up.checked = s.up;
+  f['lego-on'].checked = s.lego !== null;
+  if (s.lego !== null) f.lego.value = s.lego;
 }
 
 function paintControls(s) {
@@ -60,6 +63,8 @@ function paintControls(s) {
   $('q').disabled = s.fm === 'png';
   $('q-out').textContent = s.fm === 'png' ? 'n/a' : String(s.q);
   $('q-hint').textContent = s.fm === 'png' ? 'PNG is lossless, so quality does nothing.' : '';
+  $('lego').disabled = s.lego === null;
+  $('lego-out').textContent = s.lego === null ? 'off' : `${s.lego} ${s.lego === 1 ? 'brick' : 'bricks'}`;
 }
 
 function paintAddress(query, before) {
@@ -172,18 +177,23 @@ function show(query, res, blob, ms) {
   setFact('f-time', `${Math.round(ms)} ms`, document.createElement('br'));
   $('f-time').append(badge);
 
-  $('note').textContent = explain(s, query, nw, res.redirected);
+  $('note').textContent = explain(s, query, nw, nh, res.redirected);
 }
 
-function explain(s, query, nw, redirected) {
+function explain(s, query, nw, nh, redirected) {
   if (!query) return 'No parameters, so this is the original file, straight off the disk.';
   if (redirected) return 'Nothing here changes the picture, so pickr sends you to the original instead of making a copy.';
   const notes = [];
   const askedW = s.w !== null ? Math.round(s.w * s.dpr) : null;
   if (askedW !== null && nw < askedW) {
-    if (!s.up && askedW > ORIGINAL.w) notes.push(`The original is ${ORIGINAL.w} px wide, and pickr won't enlarge it unless you allow it.`);
+    if (!s.up && !s.lego && askedW > ORIGINAL.w) notes.push(`The original is ${ORIGINAL.w} px wide, and pickr won't enlarge it unless you allow it.`);
     else if (s.fm && FORMAT_EDGE[s.fm] && askedW > FORMAT_EDGE[s.fm]) notes.push(`${s.fm.toUpperCase()} stops at ${FORMAT_EDGE[s.fm]} px on this little server.`);
+    else if (s.lego) notes.push('Lego pictures stop at 16 megapixels on this little server.');
     else if (s.h !== null && s.fit === 'inside') notes.push('With fit=inside it keeps its shape, so the height decided.');
+  }
+  if (s.lego) {
+    const px = Math.max(nw, nh) / s.lego;
+    notes.push(`${s.lego} ${s.lego === 1 ? 'brick' : 'bricks'} along the long side, ${px >= 10 ? Math.round(px) : px.toFixed(1)} px each.`);
   }
   if (s.dpr !== 1) notes.push(`At ${s.dpr}× you get ${s.dpr} times the pixels, shown at the size you asked for.`);
   if (s.w === null && s.h === null && s.fm) notes.push('Same size, new format.');

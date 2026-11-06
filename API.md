@@ -21,11 +21,12 @@ Any file type is accepted, up to 1 GB. The multipart field must be called `file`
     https://i.juan.is/ID.jpg?w=400&h=400&fit=cover      cropped square
     https://i.juan.is/ID.jpg?w=800&fm=webp&q=75          format and quality
     https://i.juan.is/ID.jpg?w=400&dpr=2                 retina: 800 wide
+    https://i.juan.is/ID.jpg?lego=48&w=1200              48 lego bricks along the long side, 1200 wide
     https://i.juan.is/ID.mp4              streams
     https://i.juan.is/ID.mp4?t=3&w=400    a frame at 3 s, 400 wide
     https://i.juan.is/ID.pdf?dl=1         download with the original filename
 
-Parameters: `w`, `h` (pixels), `fit` = `inside` (default) | `cover` | `fill`, `fm` = `jpg` | `png` | `webp` | `avif`, `q` = 1–100 (default 80), `dpr` = 1–3, `up=1` to allow enlarging, `t` = seconds (video). Animations are never enlarged. Unknown parameters are ignored. Output is capped at 4096 pixels on both sides (2560 for WebP, 1600 for AVIF), so `w` alone on a very tall image can come back narrower than asked. `dpr` accepts fractions such as 1.5. HEIC originals are served as they are, whatever the parameters.
+Parameters: `w`, `h` (pixels), `fit` = `inside` (default) | `cover` | `fill`, `fm` = `jpg` | `png` | `webp` | `avif`, `q` = 1–100 (default 80), `dpr` = 1–3, `up=1` to allow enlarging, `lego` = 1–128 (the picture rebuilt from that many 1×1 lego bricks along its long side, 30 px a brick unless `w` or `h` asks for a size; after [Legofy](https://github.com/JuanPotato/Legofy)), `t` = seconds (video). Animations are never enlarged, and `lego` turns one into a still of its first frame. A lego picture stops at 16 megapixels. Unknown parameters are ignored. Output is capped at 4096 pixels on both sides (2560 for WebP, 1600 for AVIF), so `w` alone on a very tall image can come back narrower than asked. `dpr` accepts fractions such as 1.5. HEIC originals are served as they are, whatever the parameters.
 
 Errors are JSON `{"error": "…"}` and are never cached. A `503 {"error": "busy"}` with `Retry-After` means too many renders are running at once: wait that many seconds and ask again. A `422` means the file cannot be rendered with those parameters. A query that changes nothing (an unknown parameter, or any parameter on a file that cannot be rendered) answers `302` to the plain URL. Too many API requests from one address answer `429`: slow down. A `507` means the server is short of disk space; try again later.
 

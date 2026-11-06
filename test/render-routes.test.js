@@ -29,6 +29,11 @@ test('nothing applies: a redirect to the original; variants when parameters appl
 
   const webp = await get(app, `/_render/${f.id}.jpg?w=50&fm=webp`);
   assert.equal(webp.headers['content-type'], 'image/webp');
+
+  const lego = await get(app, `/_render/${f.id}.jpg?lego=8`);
+  assert.equal(lego.statusCode, 200, 'lego alone is a render, not the redirect');
+  const lm = await sharp(lego.rawPayload).metadata();
+  assert.deepEqual([lm.width, lm.height], [180, 240]);
   await cleanup();
 });
 

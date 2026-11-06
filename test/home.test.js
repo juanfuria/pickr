@@ -17,23 +17,25 @@ test('the home page builds the shortest query that means the same thing', () => 
   assert.equal(buildQuery({ ...DEFAULTS, w: 400, h: 400, fit: 'cover' }), 'w=400&h=400&fit=cover');
   assert.equal(buildQuery({ ...DEFAULTS, w: 400, fm: 'png', q: 50 }), 'w=400&fm=png', 'png ignores quality');
   assert.equal(buildQuery({ ...DEFAULTS, w: 400, q: 55, dpr: 1.5, up: true }), 'w=400&q=55&dpr=1.5&up=1');
+  assert.equal(buildQuery({ ...DEFAULTS, w: 800, lego: 48 }), 'w=800&lego=48');
 });
 
 test('the home page reads a shared hash back, clamped like the server', () => {
-  const s = { ...DEFAULTS, w: 640, h: 480, fit: 'fill', fm: 'avif', q: 42, dpr: 2, up: true };
+  const s = { ...DEFAULTS, w: 640, h: 480, fit: 'fill', fm: 'avif', q: 42, dpr: 2, up: true, lego: 32 };
   assert.deepEqual(parseQuery(buildQuery(s)), s);
   assert.deepEqual(parseQuery(''), DEFAULTS);
   assert.deepEqual(parseQuery('#w=800'), { ...DEFAULTS, w: 800 });
-  const odd = parseQuery('w=99999&q=0&dpr=9&fit=sideways&fm=gif&up=yes&junk=1');
-  assert.deepEqual(odd, { ...DEFAULTS, w: 4096, q: 1, dpr: 3 });
+  const odd = parseQuery('w=99999&q=0&dpr=9&fit=sideways&fm=gif&up=yes&junk=1&lego=999');
+  assert.deepEqual(odd, { ...DEFAULTS, w: 4096, q: 1, dpr: 3, lego: 128 });
+  assert.equal(parseQuery('lego=0').lego, 1);
 });
 
 test('whatever the home page builds, the server reads the same values', () => {
-  const s = { ...DEFAULTS, w: 1200, h: 300, fit: 'cover', fm: 'webp', q: 65, dpr: 1.5, up: true };
+  const s = { ...DEFAULTS, w: 1200, h: 300, fit: 'cover', fm: 'webp', q: 65, dpr: 1.5, up: true, lego: 40 };
   const p = parseImageParams(Object.fromEntries(new URLSearchParams(buildQuery(s))));
   assert.deepEqual(
-    { w: p.w, h: p.h, fit: p.fit, fm: p.fm, q: p.q, dpr: p.dpr, up: p.up },
-    { w: 1200, h: 300, fit: 'cover', fm: 'webp', q: 65, dpr: 1.5, up: true },
+    { w: p.w, h: p.h, fit: p.fit, fm: p.fm, q: p.q, dpr: p.dpr, up: p.up, lego: p.lego },
+    { w: 1200, h: 300, fit: 'cover', fm: 'webp', q: 65, dpr: 1.5, up: true, lego: 40 },
   );
 });
 

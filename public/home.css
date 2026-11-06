@@ -126,6 +126,7 @@ fieldset:disabled .hint { opacity: 0.6; }
 .pills input:focus-visible + span { outline: 2px solid var(--red); outline-offset: 2px; }
 .pills input:not(:disabled):hover + span { border-color: var(--ink); }
 .hint { margin: 6px 0 0; font-size: 13px; color: var(--muted); }
+.hint a { color: inherit; }
 .reset { justify-self: start; }
 
 .foot { grid-area: foot; font-size: 14px; color: var(--muted); }

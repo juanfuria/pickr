@@ -104,6 +104,16 @@
       </div>
     </div>
 
+    <div class="control">
+      <div class="row">
+        <label class="check"><input type="checkbox" id="lego-on" name="lego-on"> Lego</label>
+        <code class="param">lego</code>
+        <output id="lego-out" for="lego"></output>
+      </div>
+      <input type="range" id="lego" name="lego" min="1" max="128" step="1" value="48" aria-label="Bricks along the long side">
+      <p class="hint">Bricks along the long side, after <a href="https://github.com/JuanPotato/Legofy">Legofy</a>.</p>
+    </div>
+
     <button type="reset" class="button reset" id="reset">Start again</button>
   </form>
 

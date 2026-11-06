@@ -1,4 +1,5 @@
 export const MAX_EDGE = 4096;
+export const MAX_LEGO = 128; // bricks along the long side
 const FITS = new Set(['inside', 'cover', 'fill']);
 const FORMATS = { jpg: 'jpeg', jpeg: 'jpeg', png: 'png', webp: 'webp', avif: 'avif' };
 
@@ -25,8 +26,10 @@ export function parseImageParams(query = {}) {
   const q = int(query.q, 1, 100) ?? 80;
   const dpr = num(query.dpr, 1, 3) ?? 1;
   const up = query.up === '1';
-  const active = w !== null || h !== null || fm !== null || int(query.q, 1, 100) !== null || num(query.dpr, 1, 3) !== null;
-  return { w, h, fit, fm, q, dpr, up, active };
+  const lego = int(query.lego, 1, MAX_LEGO);
+  const active = w !== null || h !== null || fm !== null || int(query.q, 1, 100) !== null || num(query.dpr, 1, 3) !== null
+    || lego !== null;
+  return { w, h, fit, fm, q, dpr, up, lego, active };
 }
 
 export function parseVideoParams(query = {}) {

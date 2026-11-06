@@ -124,3 +124,62 @@ test('poster frames from video, composable with image params', async () => {
   assert.deepEqual((await dims(small.body)).slice(0, 2), [64, 48]);
   assert.equal((await posterFrame(fixture('clip.mp4'), 500)).length, 0);
 });
+
+const solid = (width, height, background) => sharp({ create: { width, height, channels: 3, background } }).png().toBuffer();
+const pixels = async (body) => {
+  const { data, info } = await sharp(body).raw().toBuffer({ resolveWithObject: true });
+  const at = (x, y) => [...data.subarray((y * info.width + x) * info.channels, (y * info.width + x) * info.channels + 3)];
+  const brick = (bx, by, size) => {
+    const all = [];
+    for (let y = by * size; y < (by + 1) * size; y++) for (let x = bx * size; x < (bx + 1) * size; x++) all.push(at(x, y));
+    const lum = all.map(([r, g, b]) => r + g + b);
+    const mean = (i) => all.reduce((s, p) => s + p[i], 0) / all.length;
+    return { r: mean(0), g: mean(1), b: mean(2), lum: lum.reduce((a, b) => a + b, 0) / lum.length / 3, range: (Math.max(...lum) - Math.min(...lum)) / 3 };
+  };
+  return { at, brick, info };
+};
+
+test('lego: N bricks along the long side, 30 px each unless a size is asked', async () => {
+  const red = await solid(300, 200, '#c0392b');
+  assert.deepEqual(await dims((await renderImage(red, P({ lego: '10' }))).body), [300, 210, 'png', 1], '10 x 7 bricks');
+  assert.deepEqual(await dims((await renderImage(red, P({ lego: '10', w: '200' }))).body), [200, 140, 'png', 1]);
+  assert.deepEqual(await dims((await renderImage(red, P({ lego: '10', w: '100', dpr: '2' }))).body), [200, 140, 'png', 1]);
+  // photo.jpg is 240x320 once upright: 6 x 8 bricks
+  assert.deepEqual(await dims((await renderImage(fixture('photo.jpg'), P({ lego: '8' }))).body), [180, 240, 'jpeg', 1]);
+  assert.equal((await renderImage(red, P({ lego: '10', fm: 'webp' }))).mime, 'image/webp');
+  const one = await renderImage(red, P({ lego: '1' }));
+  assert.deepEqual(await dims(one.body), [30, 30, 'png', 1], 'one brick is a square');
+});
+
+test('lego: every brick is the same tile, with a stud, in the colour of the picture', async () => {
+  const { at, brick } = await pixels((await renderImage(await solid(300, 200, '#c0392b'), P({ lego: '10' }))).body);
+  for (const [x, y] of [[3, 3], [15, 15], [27, 9], [12, 25], [0, 0], [29, 29]]) {
+    assert.deepEqual(at(x + 30, y), at(x, y), `tile repeats across at ${x},${y}`);
+    assert.deepEqual(at(x + 90, y + 60), at(x, y), `tile repeats down at ${x},${y}`);
+  }
+  const b = brick(0, 0, 30);
+  assert.ok(b.range > 40, `a brick is shaded, not flat (range ${b.range})`);
+  assert.ok(b.r > b.g + 60 && b.r > b.b + 60, `still red: ${JSON.stringify(b)}`);
+});
+
+test('lego: black and white bricks keep their shading', async () => {
+  // left half black, right half white, 4 bricks across
+  const half = await sharp({ create: { width: 200, height: 100, channels: 3, background: '#000' } })
+    .composite([{ input: await solid(100, 100, '#fff'), left: 100, top: 0 }]).png().toBuffer();
+  const { brick } = await pixels((await renderImage(half, P({ lego: '4' }))).body);
+  const black = brick(0, 0, 30);
+  const white = brick(3, 0, 30);
+  assert.ok(black.lum < 80 && white.lum > 175, `dark and light: ${black.lum} / ${white.lum}`);
+  assert.ok(black.range > 30 && white.range > 30, `shading survives both ends: ${black.range} / ${white.range}`);
+});
+
+test('lego: a big ask stays inside the pixel budget; animations give their first frame', async () => {
+  const square = await solid(64, 64, '#2e86de');
+  const out = await renderImage(square, P({ lego: '128', w: '4096', fm: 'jpg' }));
+  const [w, h] = await dims(out.body);
+  assert.ok(w * h <= 16_000_000 && w <= 4096 && h <= 4096, `${w}x${h}`);
+  assert.equal(w % 128, 0, 'whole bricks');
+  const gif = await renderImage(fixture('animated.gif'), P({ lego: '12' }));
+  assert.equal(gif.mime, 'image/gif');
+  assert.equal((await dims(gif.body))[3], 1);
+});

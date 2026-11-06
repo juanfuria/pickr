@@ -1,10 +1,11 @@
 // The URL grammar as the home page speaks it: the shortest query that means the same thing to the server,
 // so equal pictures share one cache entry. Pure, so the tests can import it.
 
-export const DEFAULTS = Object.freeze({ w: null, h: null, fit: 'inside', fm: null, q: 80, dpr: 1, up: false });
+export const DEFAULTS = Object.freeze({ w: null, h: null, fit: 'inside', fm: null, q: 80, dpr: 1, up: false, lego: null });
 export const FITS = ['inside', 'cover', 'fill'];
 export const FORMATS = ['jpg', 'webp', 'avif', 'png'];
 const MAX_EDGE = 4096;
+const MAX_LEGO = 128;
 
 const clamp = (n, min, max) => Math.min(max, Math.max(min, n));
 
@@ -17,6 +18,7 @@ export function buildQuery(s) {
   if (s.q !== DEFAULTS.q && s.fm !== 'png') out.push(['q', s.q]);
   if (s.dpr !== DEFAULTS.dpr) out.push(['dpr', s.dpr]);
   if (s.up) out.push(['up', 1]);
+  if (s.lego !== null) out.push(['lego', s.lego]);
   return out.map(([k, v]) => `${k}=${v}`).join('&');
 }
 
@@ -35,5 +37,6 @@ export function parseQuery(text) {
     q: int('q', 1, 100) ?? DEFAULTS.q,
     dpr: Number.isFinite(dpr) ? clamp(dpr, 1, 3) : DEFAULTS.dpr,
     up: p.get('up') === '1',
+    lego: int('lego', 1, MAX_LEGO),
   };
 }
