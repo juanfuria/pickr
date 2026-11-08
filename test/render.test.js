@@ -173,6 +173,22 @@ test('lego: black and white bricks keep their shading', async () => {
   assert.ok(black.range > 30 && white.range > 30, `shading survives both ends: ${black.range} / ${white.range}`);
 });
 
+test('lego: a transparent picture keeps its holes, brick by brick; JPEG still lands on white', async () => {
+  // left half opaque red, right half clear: 4 x 2 bricks of 30 px
+  const holes = await sharp({ create: { width: 200, height: 100, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+    .composite([{ input: await solid(100, 100, '#c0392b'), left: 0, top: 0 }]).png().toBuffer();
+  const png = await renderImage(holes, P({ lego: '4' }));
+  const { data, info } = await sharp(png.body).raw().toBuffer({ resolveWithObject: true });
+  assert.equal(info.channels, 4, 'a PNG keeps its alpha');
+  const alpha = (x, y) => data[(y * info.width + x) * 4 + 3];
+  for (const [x, y] of [[2, 2], [15, 15], [45, 40], [59, 59]]) assert.equal(alpha(x, y), 255, `a covered brick is solid at ${x},${y}`);
+  for (const [x, y] of [[62, 2], [75, 15], [105, 40], [119, 59]]) assert.equal(alpha(x, y), 0, `an empty brick is a hole at ${x},${y}`);
+  const red = (await pixels(png.body)).brick(0, 0, 30);
+  assert.ok(red.r > red.g + 60, `the solid bricks keep the picture's colour: ${JSON.stringify(red)}`);
+  const jpeg = await renderImage(holes, P({ lego: '4', fm: 'jpg' }));
+  assert.ok((await pixels(jpeg.body)).brick(3, 0, 30).lum > 175, 'a JPEG has no holes: the clear part is white bricks, as before');
+});
+
 test('lego: a big ask stays inside the pixel budget; animations give their first frame', async () => {
   const square = await solid(64, 64, '#2e86de');
   const out = await renderImage(square, P({ lego: '128', w: '4096', fm: 'jpg' }));

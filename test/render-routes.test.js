@@ -32,6 +32,8 @@ test('nothing applies: a redirect to the original; variants when parameters appl
 
   const lego = await get(app, `/_render/${f.id}.jpg?lego=8`);
   assert.equal(lego.statusCode, 200, 'lego alone is a render, not the redirect');
+  // renders, like the originals, can be read by canvases on other sites (the world at juan.is reads its sprites)
+  for (const r of [small, webp, lego, orig]) assert.equal(r.headers['access-control-allow-origin'], '*');
   const lm = await sharp(lego.rawPayload).metadata();
   assert.deepEqual([lm.width, lm.height], [180, 240]);
   await cleanup();

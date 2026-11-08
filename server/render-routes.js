@@ -45,6 +45,8 @@ export default async function renderRoutes(app, { db, root, renderLimiter = crea
     // A render can outlive a DELETE: its purge has already run, so output for a file that is gone must never be cached.
     const stillLive = () => { if (!getLiveFile(db, row.id)) throw httpError(404, 'not found'); };
     reply.header('Cache-Control', IMMUTABLE);
+    // Like the originals in nginx: a canvas on another site (the world at juan.is) can read a render's pixels.
+    reply.header('Access-Control-Allow-Origin', '*');
 
     const q = req.query;
     if (q.dl === '1') {

@@ -36,8 +36,10 @@ function brickTile(size) {
 }
 
 // The picture as N bricks along its long side: shrink to one pixel per brick, blow each pixel up into a square,
-// and lay the brick over every square. Returns raw upright pixels for the usual resize and encode to finish.
-async function legoPicture(input, p, meta, edge) {
+// and lay the brick over every square. A picture with transparency keeps it, a brick at a time, when the format can
+// (a brick is there when most of what it covers is): sprites stay sprites. JPEG has no holes: white bricks, as
+// always. Returns raw upright pixels for the usual resize and encode to finish.
+async function legoPicture(input, p, meta, edge, keepAlpha) {
   const swap = (meta.orientation ?? 1) >= 5;
   const fw = meta.width;
   const fh = meta.pageHeight ?? meta.height;
@@ -49,18 +51,31 @@ async function legoPicture(input, p, meta, edge) {
   const fits = Math.min(Math.floor(edge / Math.max(cols, rows)), Math.floor(Math.sqrt(MAX_LEGO_PIXELS / (cols * rows))));
   const size = Math.max(1, Math.min(want ? Math.ceil(want) : BRICK, fits));
 
-  const grid = await sharp(input, { failOn: 'error' }).timeout(TIMEOUT).rotate()
-    .resize(cols, rows, { fit: 'fill' })
-    .flatten({ background: '#ffffff' })
-    .toColourspace('srgb')
-    .raw().toBuffer({ resolveWithObject: true });
-  const raw = { width: grid.info.width, height: grid.info.height, channels: grid.info.channels };
-  const lego = await sharp(grid.data, { raw }).timeout(TIMEOUT)
+  let shrunk = sharp(input, { failOn: 'error' }).timeout(TIMEOUT).rotate().resize(cols, rows, { fit: 'fill' });
+  shrunk = keepAlpha ? shrunk.ensureAlpha() : shrunk.flatten({ background: '#ffffff' });
+  const grid = await shrunk.toColourspace('srgb').raw().toBuffer({ resolveWithObject: true });
+  const n = cols * rows, ch = grid.info.channels, colour = Buffer.alloc(n * 3), solid = new Uint8Array(n);
+  for (let i = 0; i < n; i++) {
+    colour.set(grid.data.subarray(i * ch, i * ch + 3), i * 3);
+    solid[i] = !keepAlpha || grid.data[i * ch + 3] >= 128 ? 255 : 0;
+  }
+  const lego = await sharp(colour, { raw: { width: cols, height: rows, channels: 3 } }).timeout(TIMEOUT)
     .resize(cols * size, rows * size, { kernel: 'nearest' })
     .composite([{ input: brickTile(size), tile: true, gravity: 'northwest', blend: 'hard-light' }])
     .removeAlpha()
     .raw().toBuffer({ resolveWithObject: true });
-  return { data: lego.data, raw: { width: lego.info.width, height: lego.info.height, channels: lego.info.channels } };
+  const { width, height } = lego.info;
+  if (!keepAlpha) return { data: lego.data, raw: { width, height, channels: 3 } };
+  const rgba = Buffer.alloc(width * height * 4);
+  for (let y = 0; y < height; y++) {
+    const row = Math.floor(y / size) * cols;
+    for (let x = 0; x < width; x++) {
+      const o = (y * width + x) * 4;
+      lego.data.copy(rgba, o, (y * width + x) * 3, (y * width + x) * 3 + 3);
+      rgba[o + 3] = solid[row + Math.floor(x / size)];
+    }
+  }
+  return { data: rgba, raw: { width, height, channels: 4 } };
 }
 
 export async function renderImage(input, p, { maxEdge = MAX_EDGE, maxFramePixels = MAX_FRAME_PIXELS } = {}) {
@@ -81,7 +96,7 @@ export async function renderImage(input, p, { maxEdge = MAX_EDGE, maxFramePixels
 
   let img;
   if (p.lego) {
-    const lego = await legoPicture(input, p, meta, edge);
+    const lego = await legoPicture(input, p, meta, edge, Boolean(meta.hasAlpha) && fmt !== 'jpeg');
     img = sharp(lego.data, { raw: lego.raw }).timeout(TIMEOUT);
   } else {
     img = sharp(input, { pages: frames, failOn: 'error' }).rotate().timeout(TIMEOUT);
