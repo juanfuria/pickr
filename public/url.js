@@ -1,7 +1,7 @@
 // The URL grammar as the home page speaks it: the shortest query that means the same thing to the server,
 // so equal pictures share one cache entry. Pure, so the tests can import it.
 
-export const DEFAULTS = Object.freeze({ w: null, h: null, fit: 'inside', fm: null, q: 80, dpr: 1, up: false, lego: null });
+export const DEFAULTS = Object.freeze({ w: null, h: null, fit: 'inside', fm: null, q: 80, dpr: 1, up: false, lego: null, rect: null });
 export const FITS = ['inside', 'cover', 'fill'];
 export const FORMATS = ['jpg', 'webp', 'avif', 'png'];
 const MAX_EDGE = 4096;
@@ -9,8 +9,17 @@ const MAX_LEGO = 128;
 
 const clamp = (n, min, max) => Math.min(max, Math.max(min, n));
 
+// rect=x,y,w,h, the same grammar as the server: four non-negative integers, an empty rectangle is none.
+export function parseRect(text) {
+  const m = /^(\d+),(\d+),(\d+),(\d+)$/.exec(String(text ?? ''));
+  if (!m) return null;
+  const [x, y, w, h] = m.slice(1).map(Number);
+  return w < 1 || h < 1 ? null : { x, y, w, h };
+}
+
 export function buildQuery(s) {
   const out = [];
+  if (s.rect) out.push(['rect', `${s.rect.x},${s.rect.y},${s.rect.w},${s.rect.h}`]); // the cut comes first, as it happens first
   if (s.w !== null) out.push(['w', s.w]);
   if (s.h !== null) out.push(['h', s.h]);
   if (s.w !== null && s.h !== null && s.fit !== DEFAULTS.fit) out.push(['fit', s.fit]);
@@ -38,5 +47,6 @@ export function parseQuery(text) {
     dpr: Number.isFinite(dpr) ? clamp(dpr, 1, 3) : DEFAULTS.dpr,
     up: p.get('up') === '1',
     lego: int('lego', 1, MAX_LEGO),
+    rect: parseRect(p.get('rect')),
   };
 }

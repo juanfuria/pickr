@@ -2,6 +2,7 @@ import sharp from 'sharp';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { MAX_EDGE } from './params.js';
+import { httpError } from './http.js';
 
 const run = promisify(execFile);
 const MIME = { jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', avif: 'image/avif', gif: 'image/gif' };
@@ -35,15 +36,27 @@ function brickTile(size) {
 </svg>`);
 }
 
+// The picture's size once EXIF orientation is applied, which is the frame every parameter refers to.
+function upright(meta) {
+  const swap = (meta.orientation ?? 1) >= 5;
+  const fw = meta.width;
+  const fh = meta.pageHeight ?? meta.height;
+  return swap ? [fh, fw] : [fw, fh];
+}
+
+// rect, clamped into the upright picture. A rectangle that starts outside it is the client's mistake, not a crop.
+function cutRegion(rect, W, H) {
+  if (!rect) return null;
+  if (rect.x >= W || rect.y >= H) throw httpError(422, 'rect is outside the picture'); // the route passes it through as it is
+  return { left: rect.x, top: rect.y, width: Math.min(rect.w, W - rect.x), height: Math.min(rect.h, H - rect.y) };
+}
+
 // The picture as N bricks along its long side: shrink to one pixel per brick, blow each pixel up into a square,
 // and lay the brick over every square. A picture with transparency keeps it, a brick at a time, when the format can
 // (a brick is there when most of what it covers is): sprites stay sprites. JPEG has no holes: white bricks, as
 // always. Returns raw upright pixels for the usual resize and encode to finish.
-async function legoPicture(input, p, meta, edge, keepAlpha) {
-  const swap = (meta.orientation ?? 1) >= 5;
-  const fw = meta.width;
-  const fh = meta.pageHeight ?? meta.height;
-  const [W, H] = swap ? [fh, fw] : [fw, fh];
+async function legoPicture(input, p, meta, edge, keepAlpha, region) {
+  const [W, H] = region ? [region.width, region.height] : upright(meta);
   const cols = W >= H ? p.lego : Math.max(1, Math.round((p.lego * W) / H));
   const rows = H > W ? p.lego : Math.max(1, Math.round((p.lego * H) / W));
   // built no bigger than the output can be: the format's edge caps it before the encoder would
@@ -51,7 +64,9 @@ async function legoPicture(input, p, meta, edge, keepAlpha) {
   const fits = Math.min(Math.floor(edge / Math.max(cols, rows)), Math.floor(Math.sqrt(MAX_LEGO_PIXELS / (cols * rows))));
   const size = Math.max(1, Math.min(want ? Math.ceil(want) : BRICK, fits));
 
-  let shrunk = sharp(input, { failOn: 'error' }).timeout(TIMEOUT).rotate().resize(cols, rows, { fit: 'fill' });
+  let shrunk = sharp(input, { failOn: 'error' }).timeout(TIMEOUT).rotate();
+  if (region) shrunk = shrunk.extract(region);
+  shrunk = shrunk.resize(cols, rows, { fit: 'fill' });
   shrunk = keepAlpha ? shrunk.ensureAlpha() : shrunk.flatten({ background: '#ffffff' });
   const grid = await shrunk.toColourspace('srgb').raw().toBuffer({ resolveWithObject: true });
   const n = cols * rows, ch = grid.info.channels, colour = Buffer.alloc(n * 3), solid = new Uint8Array(n);
@@ -94,12 +109,14 @@ export async function renderImage(input, p, { maxEdge = MAX_EDGE, maxFramePixels
     ? Math.max(1, Math.min(pages, MAX_FRAMES, Math.floor(maxFramePixels / (meta.width * frameHeight))))
     : 1;
 
+  const region = cutRegion(p.rect, ...upright(meta));
   let img;
   if (p.lego) {
-    const lego = await legoPicture(input, p, meta, edge, Boolean(meta.hasAlpha) && fmt !== 'jpeg');
+    const lego = await legoPicture(input, p, meta, edge, Boolean(meta.hasAlpha) && fmt !== 'jpeg', region);
     img = sharp(lego.data, { raw: lego.raw }).timeout(TIMEOUT);
   } else {
     img = sharp(input, { pages: frames, failOn: 'error' }).rotate().timeout(TIMEOUT);
+    if (region) img = img.extract(region);
   }
   const w = p.w ? Math.min(Math.round(p.w * p.dpr), edge) : null;
   const h = p.h ? Math.min(Math.round(p.h * p.dpr), edge) : null;

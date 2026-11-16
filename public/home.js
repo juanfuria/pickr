@@ -1,4 +1,5 @@
 import { DEFAULTS, buildQuery, parseQuery } from './url.js';
+import { defaultRect, clampRect, drawRect, moveRect, resizeRect, mapToSource } from './rect.js';
 
 const $ = (id) => document.getElementById(id);
 const main = document.querySelector('main');
@@ -16,6 +17,8 @@ const TYPES = { 'image/jpeg': 'JPEG', 'image/webp': 'WebP', 'image/avif': 'AVIF'
 const form = $('controls');
 const canvas = $('canvas');
 const img = $('picture');
+const minimap = $('minimap');
+const box = $('box');
 let state = { ...DEFAULTS };
 let shownQuery = null;
 let wanted = null;
@@ -35,7 +38,16 @@ function readForm() {
     dpr: Number(f.dpr.value),
     up: f.up.checked,
     lego: f['lego-on'].checked ? Number(f.lego.value) : null,
+    rect: f['rect-on'].checked ? clampRect({ x: f['rect-x'].value, y: f['rect-y'].value, w: f['rect-w'].value, h: f['rect-h'].value }, ORIGINAL.w, ORIGINAL.h) : null,
   };
+}
+
+function writeRect(r) {
+  const f = form.elements;
+  f['rect-x'].value = r.x;
+  f['rect-y'].value = r.y;
+  f['rect-w'].value = r.w;
+  f['rect-h'].value = r.h;
 }
 
 function writeForm(s) {
@@ -51,6 +63,8 @@ function writeForm(s) {
   f.up.checked = s.up;
   f['lego-on'].checked = s.lego !== null;
   if (s.lego !== null) f.lego.value = s.lego;
+  f['rect-on'].checked = s.rect !== null;
+  if (s.rect !== null) writeRect(s.rect);
 }
 
 function paintControls(s) {
@@ -65,6 +79,15 @@ function paintControls(s) {
   $('q-hint').textContent = s.fm === 'png' ? 'PNG is lossless, so quality does nothing.' : '';
   $('lego').disabled = s.lego === null;
   $('lego-out').textContent = s.lego === null ? 'off' : `${s.lego} ${s.lego === 1 ? 'brick' : 'bricks'}`;
+  for (const k of ['x', 'y', 'w', 'h']) $(`rect-${k}`).disabled = s.rect === null;
+  $('rect-out').textContent = s.rect === null ? 'off' : `${s.rect.w} × ${s.rect.h}`;
+  box.hidden = s.rect === null;
+  if (s.rect !== null) {
+    box.style.left = `${(s.rect.x / ORIGINAL.w) * 100}%`;
+    box.style.top = `${(s.rect.y / ORIGINAL.h) * 100}%`;
+    box.style.width = `${(s.rect.w / ORIGINAL.w) * 100}%`;
+    box.style.height = `${(s.rect.h / ORIGINAL.h) * 100}%`;
+  }
 }
 
 function paintAddress(query, before) {
@@ -184,9 +207,11 @@ function explain(s, query, nw, nh, redirected) {
   if (!query) return 'No parameters, so this is the original file, straight off the disk.';
   if (redirected) return 'Nothing here changes the picture, so pickr sends you to the original instead of making a copy.';
   const notes = [];
+  const base = s.rect ? { w: s.rect.w, h: s.rect.h, name: 'cut' } : { ...ORIGINAL, name: 'original' };
+  if (s.rect) notes.push(`${s.rect.w} × ${s.rect.h} cut from the original at ${s.rect.x},${s.rect.y}, before anything else.`);
   const askedW = s.w !== null ? Math.round(s.w * s.dpr) : null;
   if (askedW !== null && nw < askedW) {
-    if (!s.up && !s.lego && askedW > ORIGINAL.w) notes.push(`The original is ${ORIGINAL.w} px wide, and pickr won't enlarge it unless you allow it.`);
+    if (!s.up && !s.lego && askedW > base.w) notes.push(`The ${base.name} is ${base.w} px wide, and pickr won't enlarge it unless you allow it.`);
     else if (s.fm && FORMAT_EDGE[s.fm] && askedW > FORMAT_EDGE[s.fm]) notes.push(`${s.fm.toUpperCase()} stops at ${FORMAT_EDGE[s.fm]} px on this little server.`);
     else if (s.lego) notes.push('Lego pictures stop at 16 megapixels on this little server.');
     else if (s.h !== null && s.fit === 'inside') notes.push('With fit=inside it keeps its shape, so the height decided.');
@@ -199,6 +224,41 @@ function explain(s, query, nw, nh, redirected) {
   if (s.w === null && s.h === null && s.fm) notes.push('Same size, new format.');
   return notes.join(' ');
 }
+
+$('rect-on').addEventListener('change', (e) => {
+  if (e.target.checked && form.elements['rect-w'].value === '') writeRect(defaultRect(ORIGINAL.w, ORIGINAL.h));
+});
+document.querySelector('.xywh').addEventListener('change', () => {
+  if (form.elements['rect-on'].checked) writeRect(readForm().rect); // what was typed, settled: whole and inside
+});
+
+// The minimap: press on empty picture to draw a box, on the box to move it, on the corner to resize it.
+let drag = null;
+const mapPoint = (e) => {
+  const b = minimap.getBoundingClientRect();
+  return mapToSource({ px: e.clientX - b.left, py: e.clientY - b.top }, b, ORIGINAL.w, ORIGINAL.h);
+};
+const setRect = (r) => { writeRect(r); update(); };
+minimap.addEventListener('pointerdown', (e) => {
+  if (e.button !== 0) return;
+  e.preventDefault();
+  const on = form.elements['rect-on'].checked;
+  const p = mapPoint(e);
+  const mode = on && e.target === $('handle') ? 'resize' : on && e.target === box ? 'move' : 'draw';
+  drag = { mode, start: p, origin: on ? readForm().rect : null };
+  minimap.setPointerCapture(e.pointerId);
+  form.elements['rect-on'].checked = true;
+  if (mode === 'draw') setRect(drawRect(p, p, ORIGINAL.w, ORIGINAL.h));
+});
+minimap.addEventListener('pointermove', (e) => {
+  if (!drag) return;
+  const p = mapPoint(e);
+  const W = ORIGINAL.w, H = ORIGINAL.h;
+  setRect(drag.mode === 'move' ? moveRect(drag.origin, p.x - drag.start.x, p.y - drag.start.y, W, H)
+    : drag.mode === 'resize' ? resizeRect(drag.origin, p, W, H)
+    : drawRect(drag.start, p, W, H));
+});
+for (const type of ['pointerup', 'pointercancel']) minimap.addEventListener(type, () => { drag = null; });
 
 form.addEventListener('input', update);
 form.addEventListener('change', update);
@@ -229,6 +289,7 @@ originalBytes = await Promise.race([
   new Promise((resolve) => setTimeout(() => resolve(null), 1500)),
 ]);
 
+$('map').src = `/${FILE}?w=480`;
 if (location.hash.length > 1) writeForm(parseQuery(location.hash));
 state = { ...DEFAULTS, w: -1 }; // force the first paint
 update();

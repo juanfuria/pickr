@@ -18,6 +18,8 @@ test('the home page builds the shortest query that means the same thing', () => 
   assert.equal(buildQuery({ ...DEFAULTS, w: 400, fm: 'png', q: 50 }), 'w=400&fm=png', 'png ignores quality');
   assert.equal(buildQuery({ ...DEFAULTS, w: 400, q: 55, dpr: 1.5, up: true }), 'w=400&q=55&dpr=1.5&up=1');
   assert.equal(buildQuery({ ...DEFAULTS, w: 800, lego: 48 }), 'w=800&lego=48');
+  assert.equal(buildQuery({ ...DEFAULTS, rect: { x: 10, y: 20, w: 300, h: 400 } }), 'rect=10,20,300,400');
+  assert.equal(buildQuery({ ...DEFAULTS, rect: { x: 0, y: 0, w: 1, h: 1 }, w: 50 }), 'rect=0,0,1,1&w=50', 'the cut comes first, as it happens first');
 });
 
 test('the home page reads a shared hash back, clamped like the server', () => {
@@ -28,14 +30,19 @@ test('the home page reads a shared hash back, clamped like the server', () => {
   const odd = parseQuery('w=99999&q=0&dpr=9&fit=sideways&fm=gif&up=yes&junk=1&lego=999');
   assert.deepEqual(odd, { ...DEFAULTS, w: 4096, q: 1, dpr: 3, lego: 128 });
   assert.equal(parseQuery('lego=0').lego, 1);
+  assert.deepEqual(parseQuery('rect=10,20,300,400').rect, { x: 10, y: 20, w: 300, h: 400 });
+  assert.deepEqual(parseQuery('rect=10%2C20%2C300%2C400').rect, { x: 10, y: 20, w: 300, h: 400 }, 'an encoded comma is a comma');
+  for (const bad of ['1,2,3', '1,2,3,4,5', '-1,0,10,10', '1.5,0,10,10', 'a,b,c,d', '0,0,0,10', '0,0,10,0']) {
+    assert.equal(parseQuery(`rect=${bad}`).rect, null, `rect=${bad}`);
+  }
 });
 
 test('whatever the home page builds, the server reads the same values', () => {
-  const s = { ...DEFAULTS, w: 1200, h: 300, fit: 'cover', fm: 'webp', q: 65, dpr: 1.5, up: true, lego: 40 };
+  const s = { ...DEFAULTS, w: 1200, h: 300, fit: 'cover', fm: 'webp', q: 65, dpr: 1.5, up: true, lego: 40, rect: { x: 5, y: 6, w: 700, h: 800 } };
   const p = parseImageParams(Object.fromEntries(new URLSearchParams(buildQuery(s))));
   assert.deepEqual(
-    { w: p.w, h: p.h, fit: p.fit, fm: p.fm, q: p.q, dpr: p.dpr, up: p.up, lego: p.lego },
-    { w: 1200, h: 300, fit: 'cover', fm: 'webp', q: 65, dpr: 1.5, up: true, lego: 40 },
+    { w: p.w, h: p.h, fit: p.fit, fm: p.fm, q: p.q, dpr: p.dpr, up: p.up, lego: p.lego, rect: p.rect },
+    { w: 1200, h: 300, fit: 'cover', fm: 'webp', q: 65, dpr: 1.5, up: true, lego: 40, rect: { x: 5, y: 6, w: 700, h: 800 } },
   );
 });
 
@@ -81,4 +88,15 @@ test('the welder works while a render is on its way, and stands still for reduce
   assert.ok(welder && isValidId(welder[1]), 'the welder is a pickr file on this host');
   assert.match(html, /<source media="\(prefers-reduced-motion: reduce\)" srcset="\/[A-Za-z0-9]+\.png">\s*<img class="welder"/);
   assert.match(css, /\.canvas\.busy ~ picture \.welder/, 'only on duty while rendering');
+});
+
+test('the minimap is on the page, takes its picture from data-file, and home.js drives it through the CSSOM', async () => {
+  const html = await readFile(join(ROOT, 'public', 'index.html'), 'utf8');
+  const js = await readFile(join(ROOT, 'public', 'home.js'), 'utf8');
+  assert.match(html, /<input type="checkbox" id="rect-on" name="rect-on">/);
+  for (const id of ['rect-x', 'rect-y', 'rect-w', 'rect-h', 'rect-out', 'minimap', 'map', 'box', 'handle']) assert.ok(html.includes(`id="${id}"`), `#${id}`);
+  assert.match(html, /<img id="map" alt=""/);
+  assert.doesNotMatch(html, /<img id="map"[^>]*\ssrc=/, 'the demo image is named once, in data-file');
+  assert.match(js, /from '\.\/rect\.js'/);
+  assert.doesNotMatch(js, /setAttribute\('style'/, 'the CSP has no unsafe-inline: the box is positioned through the CSSOM');
 });

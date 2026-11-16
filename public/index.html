@@ -118,6 +118,25 @@
       <p class="hint">Bricks along the long side, after <a href="https://github.com/JuanPotato/Legofy">Legofy</a>.</p>
     </div>
 
+    <div class="control" id="rect-control">
+      <div class="row">
+        <label class="check"><input type="checkbox" id="rect-on" name="rect-on"> Rect</label>
+        <code class="param">rect</code>
+        <output id="rect-out" for="rect-x rect-y rect-w rect-h"></output>
+      </div>
+      <div class="minimap" id="minimap">
+        <img id="map" alt="" draggable="false">
+        <div class="box" id="box" hidden><span class="handle" id="handle"></span></div>
+      </div>
+      <div class="xywh">
+        <label>x <input type="number" id="rect-x" name="rect-x" min="0" step="1" inputmode="numeric" aria-label="Left edge in pixels"></label>
+        <label>y <input type="number" id="rect-y" name="rect-y" min="0" step="1" inputmode="numeric" aria-label="Top edge in pixels"></label>
+        <label>w <input type="number" id="rect-w" name="rect-w" min="1" step="1" inputmode="numeric" aria-label="Cut width in pixels"></label>
+        <label>h <input type="number" id="rect-h" name="rect-h" min="1" step="1" inputmode="numeric" aria-label="Cut height in pixels"></label>
+      </div>
+      <p class="hint">A rectangle cut out of the original before anything else. Draw it on the little picture, drag it about, pull its corner.</p>
+    </div>
+
     <button type="reset" class="button reset" id="reset">Start again</button>
   </form>
 

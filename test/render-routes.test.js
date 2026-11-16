@@ -168,3 +168,19 @@ test('a render that finishes after its file was deleted is a 404, so nothing is 
   assert.equal(r.headers['cache-control'], 'no-store');
   await ctx.cleanup();
 });
+
+test('rect: a cut renders; a rectangle outside the picture is a 422 that says so, never cached', async () => {
+  const { app, key, cleanup } = await makeApp();
+  const f = await put(app, key, 'photo.jpg'); // 240x320 upright
+  const cut = await get(app, `/_render/${f.id}.jpg?rect=0,0,100,50`);
+  assert.equal(cut.statusCode, 200, 'rect alone is a render, not the redirect');
+  const m = await sharp(cut.rawPayload).metadata();
+  assert.deepEqual([m.width, m.height], [100, 50]);
+  const out = await get(app, `/_render/${f.id}.jpg?rect=240,0,10,10`);
+  assert.equal(out.statusCode, 422);
+  assert.deepEqual(out.json(), { error: 'rect is outside the picture' });
+  assert.equal(out.headers['cache-control'], 'no-store');
+  const junk = await get(app, `/_render/${f.id}.jpg?rect=1,2,3`);
+  assert.equal(junk.statusCode, 302, 'a malformed rect is ignored like an unknown parameter');
+  await cleanup();
+});

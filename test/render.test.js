@@ -209,3 +209,33 @@ test('lego: under a format cap the bricks stay whole, never resampled', async ()
   const webp = await renderImage(square, P({ lego: '96', w: '4096', fm: 'webp' }));
   assert.equal((await dims(webp.body))[0] % 96, 0);
 });
+
+test('rect: a rectangle cut from the upright original, before everything else', async () => {
+  const src = fixture('photo.jpg'); // 320x240 with orientation 6 → 240x320 upright
+  assert.deepEqual(await dims((await renderImage(src, P({ rect: '0,0,100,50' }))).body), [100, 50, 'jpeg', 1], 'cut on the upright picture, no resize');
+  assert.deepEqual(await dims((await renderImage(src, P({ rect: '0,0,100,50', w: '50' }))).body), [50, 25, 'jpeg', 1], 'w acts on the cut');
+  assert.deepEqual(await dims((await renderImage(src, P({ rect: '0,0,100,50', w: '200' }))).body), [100, 50, 'jpeg', 1], 'never enlarged past the cut');
+  assert.deepEqual(await dims((await renderImage(src, P({ rect: '0,0,100,50', w: '200', up: '1' }))).body), [200, 100, 'jpeg', 1], 'up=1 enlarges the cut');
+  assert.deepEqual(await dims((await renderImage(src, P({ rect: '200,300,100,100' }))).body), [40, 20, 'jpeg', 1], 'clamped into the picture');
+  assert.deepEqual(await dims((await renderImage(src, P({ rect: '0,0,240,320' }))).body), [240, 320, 'jpeg', 1], 'the whole picture is a re-encode');
+  await assert.rejects(renderImage(src, P({ rect: '240,0,10,10' })), /outside/);
+  await assert.rejects(renderImage(src, P({ rect: '0,320,10,10' })), /outside/);
+  // the right pixels, not just the right size: left half red, right half blue, cut the right half
+  const halves = await sharp({ create: { width: 200, height: 100, channels: 3, background: '#c0392b' } })
+    .composite([{ input: await solid(100, 100, '#2980b9'), left: 100, top: 0 }]).png().toBuffer();
+  const { at, info } = await pixels((await renderImage(halves, P({ rect: '100,0,100,100' }))).body);
+  assert.deepEqual([info.width, info.height], [100, 100]);
+  assert.deepEqual(at(0, 0), [41, 128, 185]);
+  assert.deepEqual(at(99, 99), [41, 128, 185]);
+});
+
+test('rect: the cut keeps transparency, animates frame by frame, and lego builds from it', async () => {
+  const alpha = await renderImage(fixture('alpha.png'), P({ rect: '10,10,40,30' })); // 100x80
+  assert.equal(alpha.mime, 'image/png');
+  const am = await sharp(alpha.body).metadata();
+  assert.deepEqual([am.width, am.height, am.hasAlpha], [40, 30, true]);
+  const gif = await renderImage(fixture('animated.gif'), P({ rect: '0,0,30,20' })); // 120x90, 5 frames
+  assert.deepEqual(await dims(gif.body), [30, 20, 'gif', 5]);
+  // a 100x50 cut, 10 bricks along its long side: 10 x 5 bricks of 30 px
+  assert.deepEqual(await dims((await renderImage(fixture('photo.jpg'), P({ rect: '0,0,100,50', lego: '10' }))).body), [300, 150, 'jpeg', 1]);
+});

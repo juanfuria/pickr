@@ -10,6 +10,16 @@ function int(v, min, max) {
   return Math.min(max, Math.max(min, n));
 }
 
+// rect=x,y,w,h: four non-negative integers, pixels of the upright original. Anything else is no rectangle.
+function rect(v) {
+  if (typeof v !== 'string') return null;
+  const m = /^(\d+),(\d+),(\d+),(\d+)$/.exec(v);
+  if (!m) return null;
+  const [x, y, w, h] = m.slice(1).map(Number);
+  if (w < 1 || h < 1) return null;
+  return { x, y, w, h };
+}
+
 function num(v, min, max) {
   if (v === undefined || v === null) return null;
   const n = Number.parseFloat(String(v));
@@ -27,9 +37,10 @@ export function parseImageParams(query = {}) {
   const dpr = num(query.dpr, 1, 3) ?? 1;
   const up = query.up === '1';
   const lego = int(query.lego, 1, MAX_LEGO);
+  const r = rect(query.rect);
   const active = w !== null || h !== null || fm !== null || int(query.q, 1, 100) !== null || num(query.dpr, 1, 3) !== null
-    || lego !== null;
-  return { w, h, fit, fm, q, dpr, up, lego, active };
+    || lego !== null || r !== null;
+  return { w, h, fit, fm, q, dpr, up, lego, rect: r, active };
 }
 
 export function parseVideoParams(query = {}) {
