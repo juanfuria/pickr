@@ -3,6 +3,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { MAX_EDGE } from './params.js';
 import { httpError } from './http.js';
+import { windowFor, STRATEGIES, shapeBox } from '../public/window.js';
 
 const run = promisify(execFile);
 const MIME = { jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', avif: 'image/avif', gif: 'image/gif' };
@@ -49,6 +50,16 @@ function cutRegion(rect, W, H) {
   if (!rect) return null;
   if (rect.x >= W || rect.y >= H) throw httpError(422, 'rect is outside the picture'); // the route passes it through as it is
   return { left: rect.x, top: rect.y, width: Math.min(rect.w, W - rect.x), height: Math.min(rect.h, H - rect.y) };
+}
+
+// The one region to extract: the rect, then the window (shape, anchor, zoom) cut out of the rect, as one box.
+function regionFor(p, meta) {
+  const [W, H] = upright(meta);
+  const rect = cutRegion(p.rect, W, H);
+  const [cw, ch] = rect ? [rect.width, rect.height] : [W, H];
+  const win = windowFor(p, cw, ch);
+  if (!win) return rect;
+  return { left: (rect?.left ?? 0) + win.left, top: (rect?.top ?? 0) + win.top, width: win.width, height: win.height };
 }
 
 // The picture as N bricks along its long side: shrink to one pixel per brick, blow each pixel up into a square,
@@ -109,7 +120,19 @@ export async function renderImage(input, p, { maxEdge = MAX_EDGE, maxFramePixels
     ? Math.max(1, Math.min(pages, MAX_FRAMES, Math.floor(maxFramePixels / (meta.width * frameHeight))))
     : 1;
 
-  const region = cutRegion(p.rect, ...upright(meta));
+  const region = regionFor(p, meta);
+  // entropy and attention are sharp's own: they ride a cover resize to both sides. With ar and no sides, the
+  // sides are the shape at its own size, so the resize is a pure crop.
+  const strategy = p.crop && STRATEGIES.has(p.crop) ? sharp.strategy[p.crop] : null;
+  let fit = p.fit;
+  let pw = p.w, ph = p.h;
+  if (strategy && p.ar !== null) {
+    fit = 'cover'; // ar promises the shape, and with a strategy only the resize can make it
+    if (pw === null && ph === null) {
+      const [sw, sh] = shapeBox(p.ar, ...(region ? [region.width, region.height] : upright(meta)));
+      [pw, ph] = [Math.round(sw), Math.round(sh)];
+    }
+  }
   let img;
   if (p.lego) {
     const lego = await legoPicture(input, p, meta, edge, Boolean(meta.hasAlpha) && fmt !== 'jpeg', region);
@@ -118,10 +141,10 @@ export async function renderImage(input, p, { maxEdge = MAX_EDGE, maxFramePixels
     img = sharp(input, { pages: frames, failOn: 'error' }).rotate().timeout(TIMEOUT);
     if (region) img = img.extract(region);
   }
-  const w = p.w ? Math.min(Math.round(p.w * p.dpr), edge) : null;
-  const h = p.h ? Math.min(Math.round(p.h * p.dpr), edge) : null;
+  const w = pw ? Math.min(Math.round(pw * p.dpr), edge) : null;
+  const h = ph ? Math.min(Math.round(ph * p.dpr), edge) : null;
   if (w && h) {
-    img = img.resize({ width: w, height: h, fit: p.fit, withoutEnlargement: !enlarge });
+    img = img.resize({ width: w, height: h, fit, withoutEnlargement: !enlarge, ...(strategy && fit === 'cover' ? { position: strategy } : {}) });
   } else if (w || h) {
     // One axis given: the other is bounded by the edge so an upscale of a thin image can never explode the free side.
     img = img.resize({ width: w ?? edge, height: h ?? edge, fit: 'inside', withoutEnlargement: !enlarge });

@@ -184,3 +184,18 @@ test('rect: a cut renders; a rectangle outside the picture is a 422 that says so
   assert.equal(junk.statusCode, 302, 'a malformed rect is ignored like an unknown parameter');
   await cleanup();
 });
+
+test('shape, anchor and point render; a plain cover resize is unchanged by their absence', async () => {
+  const { app, key, cleanup } = await makeApp();
+  const f = await put(app, key, 'photo.jpg'); // 240x320 upright
+  const square = await get(app, `/_render/${f.id}.jpg?ar=1:1&w=100`);
+  assert.equal(square.statusCode, 200);
+  const sm = await sharp(square.rawPayload).metadata();
+  assert.deepEqual([sm.width, sm.height], [100, 100]);
+  for (const q of ['w=100&h=100&fit=cover&crop=bottom', 'fp-x=0.5&fp-y=0.9&fp-z=2', 'ar=16:9&crop=attention']) {
+    assert.equal((await get(app, `/_render/${f.id}.jpg?${q}`)).statusCode, 200, q);
+  }
+  const plain = await get(app, `/_render/${f.id}.jpg?crop=faces`);
+  assert.equal(plain.statusCode, 302, 'faces is not a word: nothing applies');
+  await cleanup();
+});

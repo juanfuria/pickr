@@ -70,6 +70,47 @@
       <p class="hint" id="fit-hint"></p>
     </fieldset>
 
+    <fieldset class="control" id="ar-set">
+      <legend>Shape <code class="param">ar</code></legend>
+      <div class="pills">
+        <label><input type="radio" name="ar" value="" checked><span>free</span></label>
+        <label><input type="radio" name="ar" value="1:1"><span>1:1</span></label>
+        <label><input type="radio" name="ar" value="4:3"><span>4:3</span></label>
+        <label><input type="radio" name="ar" value="3:2"><span>3:2</span></label>
+        <label><input type="radio" name="ar" value="16:9"><span>16:9</span></label>
+        <label><input type="radio" name="ar" value="9:16"><span>9:16</span></label>
+      </div>
+      <p class="hint">A window of that shape, as large as fits, cut before the resize. With only a width, the height follows.</p>
+    </fieldset>
+
+    <div class="control" id="anchor-control">
+      <div class="row">
+        <span>Anchor</span>
+        <code class="param">crop</code>
+        <code class="param">fp</code>
+        <output id="anchor-out"></output>
+      </div>
+      <div class="pills">
+        <label><input type="radio" name="anchor" value="" checked><span>centre</span></label>
+        <label><input type="radio" name="anchor" value="top"><span>top</span></label>
+        <label><input type="radio" name="anchor" value="bottom"><span>bottom</span></label>
+        <label><input type="radio" name="anchor" value="left"><span>left</span></label>
+        <label><input type="radio" name="anchor" value="right"><span>right</span></label>
+        <label><input type="radio" name="anchor" value="entropy"><span>entropy</span></label>
+        <label><input type="radio" name="anchor" value="attention"><span>attention</span></label>
+        <label><input type="radio" name="anchor" value="point"><span>point</span></label>
+      </div>
+      <input type="hidden" id="fp-x" name="fp-x">
+      <input type="hidden" id="fp-y" name="fp-y">
+      <div class="row zoom">
+        <label for="fp-z">Zoom</label>
+        <code class="param">fp-z</code>
+        <output id="fp-z-out" for="fp-z"></output>
+      </div>
+      <input type="range" id="fp-z" name="fp-z" min="1" max="8" step="0.1" value="1" aria-label="Zoom into the point">
+      <p class="hint" id="anchor-hint"></p>
+    </div>
+
     <fieldset class="control">
       <legend>Format <code class="param">fm</code></legend>
       <div class="pills">
@@ -127,6 +168,8 @@
       <div class="minimap" id="minimap">
         <img id="map" alt="" draggable="false">
         <div class="box" id="box" hidden><span class="handle" id="handle"></span></div>
+        <div class="win" id="win" hidden></div>
+        <div class="point" id="point" hidden></div>
       </div>
       <div class="xywh">
         <label>x <input type="number" id="rect-x" name="rect-x" min="0" step="1" inputmode="numeric" aria-label="Left edge in pixels"></label>
@@ -134,7 +177,7 @@
         <label>w <input type="number" id="rect-w" name="rect-w" min="1" step="1" inputmode="numeric" aria-label="Cut width in pixels"></label>
         <label>h <input type="number" id="rect-h" name="rect-h" min="1" step="1" inputmode="numeric" aria-label="Cut height in pixels"></label>
       </div>
-      <p class="hint">A rectangle cut out of the original before anything else. Draw it on the little picture, drag it about, pull its corner.</p>
+      <p class="hint" id="rect-hint">A rectangle cut out of the original before anything else. Draw it on the little picture, drag it about, pull its corner.</p>
     </div>
 
     <button type="reset" class="button reset" id="reset">Start again</button>

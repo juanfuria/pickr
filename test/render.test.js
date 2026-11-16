@@ -239,3 +239,63 @@ test('rect: the cut keeps transparency, animates frame by frame, and lego builds
   // a 100x50 cut, 10 bricks along its long side: 10 x 5 bricks of 30 px
   assert.deepEqual(await dims((await renderImage(fixture('photo.jpg'), P({ rect: '0,0,100,50', lego: '10' }))).body), [300, 150, 'jpeg', 1]);
 });
+
+const halves = async (horizontal) => {
+  // horizontal: 200x100, left red, right blue; vertical: 100x200, top red, bottom blue
+  const base = sharp({ create: { width: horizontal ? 200 : 100, height: horizontal ? 100 : 200, channels: 3, background: '#c0392b' } });
+  const blue = await solid(100, 100, '#2980b9');
+  return base.composite([{ input: blue, left: horizontal ? 100 : 0, top: horizontal ? 0 : 100 }]).png().toBuffer();
+};
+const RED = [192, 57, 43], BLUE = [41, 128, 185];
+
+test('ar: the window takes the shape, as large as fits, and w or h size it', async () => {
+  const src = fixture('photo.jpg'); // 240x320 upright
+  assert.deepEqual(await dims((await renderImage(src, P({ ar: '1:1' }))).body), [240, 240, 'jpeg', 1]);
+  assert.deepEqual(await dims((await renderImage(src, P({ ar: '1:1', w: '100' }))).body), [100, 100, 'jpeg', 1]);
+  assert.deepEqual(await dims((await renderImage(src, P({ ar: '16:9', w: '160' }))).body), [160, 90, 'jpeg', 1]);
+  assert.deepEqual(await dims((await renderImage(src, P({ ar: '16:9', w: '100', h: '100' }))).body), [100, 56, 'jpeg', 1], 'both sides given: ar shapes the cut, w and h size the output through fit');
+  assert.deepEqual(await dims((await renderImage(src, P({ ar: '16:9', w: '100', h: '100', fit: 'cover' }))).body), [100, 100, 'jpeg', 1]);
+});
+
+test('crop words anchor a cover crop; a point anchors and zooms it', async () => {
+  const v = await halves(false);
+  const top = await pixels((await renderImage(v, P({ w: '50', h: '50', fit: 'cover', crop: 'top' }))).body);
+  assert.deepEqual([top.info.width, top.info.height, top.at(25, 25)], [50, 50, RED]);
+  const bottom = await pixels((await renderImage(v, P({ w: '50', h: '50', fit: 'cover', crop: 'bottom' }))).body);
+  assert.deepEqual(bottom.at(25, 25), BLUE);
+  const h = await halves(true);
+  const left = await pixels((await renderImage(h, P({ 'fp-x': '0', 'fp-y': '0', 'fp-z': '2' }))).body);
+  assert.deepEqual([left.info.width, left.info.height, left.at(50, 25)], [100, 50, RED]);
+  const right = await pixels((await renderImage(h, P({ 'fp-x': '1', 'fp-z': '2' }))).body);
+  assert.deepEqual([right.info.width, right.info.height, right.at(50, 25)], [100, 50, BLUE]);
+  const square = await pixels((await renderImage(h, P({ ar: '1:1', 'fp-x': '1' }))).body);
+  assert.deepEqual([square.info.width, square.info.height, square.at(50, 50)], [100, 100, BLUE]);
+});
+
+test('entropy and attention look at the picture: the busy side wins; a plain word does not', async () => {
+  // flat grey with a red square on the right: edges for entropy, saturation for attention
+  const GREY = [128, 128, 128];
+  const busy = await sharp({ create: { width: 200, height: 100, channels: 3, background: '#808080' } })
+    .composite([{ input: await solid(60, 60, '#d8391f'), left: 120, top: 20 }]).png().toBuffer();
+  for (const strategy of ['entropy', 'attention']) {
+    const out = await pixels((await renderImage(busy, P({ w: '50', h: '50', fit: 'cover', crop: strategy }))).body);
+    assert.deepEqual([out.info.width, out.info.height], [50, 50], strategy);
+    assert.deepEqual(out.at(25, 25), [216, 57, 31], `${strategy} found the red square`);
+  }
+  const left = await pixels((await renderImage(busy, P({ w: '50', h: '50', fit: 'cover', crop: 'left' }))).body);
+  assert.deepEqual(left.at(25, 25), GREY);
+  const native = await pixels((await renderImage(busy, P({ ar: '1:1', crop: 'entropy' }))).body);
+  assert.deepEqual([native.info.width, native.info.height], [100, 100], 'ar alone with a strategy: the shape at its own size');
+  assert.notDeepEqual(native.at(50, 50), GREY);
+  const inside = await renderImage(busy, P({ w: '50', h: '50', crop: 'entropy' }));
+  assert.deepEqual((await dims(inside.body)).slice(0, 2), [50, 25], 'fit=inside never crops, strategy or not');
+  const shaped = await pixels((await renderImage(busy, P({ ar: '1:1', w: '50', crop: 'attention' }))).body);
+  assert.deepEqual([shaped.info.width, shaped.info.height, shaped.at(25, 25)], [50, 50, [216, 57, 31]], 'ar promises the shape, so with a strategy the resize covers');
+});
+
+test('the window is cut from the rect, and lego builds from the window', async () => {
+  const h = await halves(true);
+  const inRect = await pixels((await renderImage(h, P({ rect: '100,0,100,100', 'fp-x': '0', 'fp-y': '0', 'fp-z': '2' }))).body);
+  assert.deepEqual([inRect.info.width, inRect.info.height, inRect.at(25, 25)], [50, 50, BLUE], 'a point is a fraction of the cut');
+  assert.deepEqual(await dims((await renderImage(fixture('photo.jpg'), P({ ar: '1:1', lego: '4' }))).body), [120, 120, 'jpeg', 1], '4 x 4 bricks of a square window');
+});
