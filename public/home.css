@@ -55,7 +55,7 @@ a { color: var(--ink); }
 
 .intro { grid-area: intro; }
 .intro h1 { margin: 0 0 6px; font: 700 clamp(28px, 4.5vw, 42px)/1.1 var(--mono); letter-spacing: -0.02em; color: var(--ink); }
-/* the red egg from the drawing, as a full stop */
+/* a red full stop (it began as the red egg in the first default picture) */
 .intro h1::after { content: ""; display: inline-block; width: 0.38em; height: 0.52em; margin-left: 0.12em; border-radius: 50%; background: var(--red); vertical-align: baseline; }
 .intro p { margin: 0; max-width: 62ch; color: var(--muted); }
 
