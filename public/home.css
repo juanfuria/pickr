@@ -60,10 +60,11 @@ a { color: var(--ink); }
 }
 
 .side { grid-area: side; display: grid; gap: 20px; align-content: start; }
+.intro { display: grid; grid-template-columns: auto 1fr; column-gap: 22px; align-items: center; }
+.intro .brick { height: 104px; width: auto; display: block; }
 .intro h1 { margin: 0 0 6px; font: 700 clamp(28px, 4.5vw, 42px)/1.1 var(--mono); letter-spacing: -0.02em; color: var(--ink); }
-/* a red full stop (it began as the red egg in the first default picture) */
-.intro h1::after { content: ""; display: inline-block; width: 0.38em; height: 0.52em; margin-left: 0.12em; border-radius: 50%; background: var(--red); vertical-align: baseline; }
 .intro p { margin: 0; max-width: 62ch; color: var(--muted); }
+@media (max-width: 559px) { .intro { column-gap: 14px; } .intro .brick { height: 72px; } }
 
 .stage { min-width: 0; display: grid; gap: 12px; align-content: start; }
 

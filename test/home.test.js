@@ -193,3 +193,19 @@ test('the head names the page Sen and carries its marks and card', async () => {
   const card = await sharp(join(ROOT, 'public', 'card.png')).metadata();
   assert.deepEqual([card.width, card.height], [1200, 630], 'the stated size is the real size');
 });
+
+test('the header is the brick in one column and the name and line in the other', async () => {
+  const sharp = (await import('sharp')).default;
+  const html = await readFile(join(ROOT, 'public', 'index.html'), 'utf8');
+  const css = await readFile(join(ROOT, 'public', 'home.css'), 'utf8');
+  const brick = await sharp(join(ROOT, 'public', 'brick.png')).metadata();
+  const header = html.match(/<header class="intro">[\s\S]*?<\/header>/)[0];
+  assert.ok(header.includes(`<img class="brick" src="/_/brick.png" alt="" width="${brick.width}" height="${brick.height}">`), 'the brick, at its real size, decorative');
+  assert.match(header, /<div>\s*<h1>Sen<\/h1>\s*<p>/, 'name over line, in their own column');
+  assert.ok(header.includes(`<p>${LINE} Move something and watch the address change.</p>`));
+  assert.doesNotMatch(header, /i\.juan\.is/, 'no address in the header');
+  assert.match(css, /\.intro \{[^}]*grid-template-columns: auto 1fr/);
+  assert.match(css, /\.intro \.brick \{[^}]*height: 104px/);
+  assert.match(css, /@media \(max-width: 559px\) \{[\s\S]*?\.intro \.brick \{[^}]*height: 72px/);
+  assert.doesNotMatch(css, /h1::after/, 'the red egg is gone');
+});
