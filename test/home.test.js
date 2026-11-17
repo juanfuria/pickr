@@ -146,3 +146,17 @@ test('on a wide screen the title, picture and facts stay put while the controls 
   assert.match(wide, /grid-template-areas: "side controls" "side foot";/, "the foot sits under the controls, out of the way of the stuck column");
   assert.doesNotMatch(wide, /\.controls \{[^}]*position: sticky/, 'the controls scroll with the page');
 });
+
+test('the brick and the marks made from it are in place', async () => {
+  const sharp = (await import('sharp')).default;
+  const meta = (f) => sharp(join(ROOT, 'public', f)).metadata();
+  const brick = await meta('brick.png');
+  assert.equal(brick.hasAlpha, true, 'the brick alone, on nothing');
+  const icon = await meta('icon-32.png');
+  assert.equal(Math.max(icon.width, icon.height), 32, 'the 32px icon fits a 32px square on its long side');
+  const apple = await meta('apple-touch-icon.png');
+  assert.deepEqual([apple.width, apple.height, apple.hasAlpha], [180, 180, false], 'the apple icon is a flat 180px square');
+  const svg = await readFile(join(ROOT, 'public', 'icon.svg'), 'utf8');
+  assert.match(svg, new RegExp(`^<svg [^>]*viewBox="0 0 ${brick.width} ${brick.height}"`), 'the svg icon is the brick at its own size');
+  assert.ok(svg.includes('data:image/png;base64,'), 'with the brick inside it');
+});
