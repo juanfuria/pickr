@@ -1,7 +1,8 @@
-// The marks of the page, all made from public/brick.png: the favicon as svg and as a 32px png, the apple icon on
-// paper, and the sharing card. Run `npm run marks` when the brick changes and commit what it writes. Juan's clean
-// brick replaces the stand-in cut from the world's lego template with no change here: everything takes its size
-// from the file. The tests point MARKS_OUT at a scratch folder holding a brick, and CHROME at a stand-in.
+// The marks of the page, all made from public/brick.png: the mark itself (the brick with a white rim, which the
+// header shows), the favicon as svg and as a 32px png, the apple icon on paper, and the sharing card. Run
+// `npm run marks` when the brick changes and commit what it writes, then put the mark's new size on the header's
+// img. Juan's clean brick replaces the stand-in cut from the world's lego template with no change here: everything
+// takes its size from the file. The tests point MARKS_OUT at a scratch folder holding a brick, and CHROME at a stand-in.
 import { readFile, writeFile, unlink, access, mkdtemp, rm } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -18,7 +19,26 @@ const done = (f) => console.log(`public/${f}`);
 // Nothing is written until Chrome is known to be there: half a set of marks is worse than none.
 await access(chrome).catch(() => { throw new Error('Chrome not found; set CHROME to its binary'); });
 
-const brick = await readFile(join(PUB, 'brick.png'));
+// The mark is the brick with a two-pixel white rim, the way sprites get one: a transparent pixel with a solid
+// neighbour above, below, left or right turns white, twice over, on a canvas two pixels bigger all round.
+async function rim(png, r) {
+  const { data, info: { width, height, channels } } = await sharp(png).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const W = width + 2 * r, H = height + 2 * r, out = Buffer.alloc(W * H * 4);
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) data.copy(out, ((y + r) * W + x + r) * 4, (y * width + x) * channels, (y * width + x) * channels + 4);
+  const solid = (x, y) => x >= 0 && y >= 0 && x < W && y < H && out[(y * W + x) * 4 + 3] > 0;
+  for (let pass = 0; pass < r; pass++) {
+    const add = [];
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      if (!solid(x, y) && (solid(x - 1, y) || solid(x + 1, y) || solid(x, y - 1) || solid(x, y + 1))) add.push((y * W + x) * 4);
+    }
+    for (const i of add) out.fill(255, i, i + 4);
+  }
+  return sharp(out, { raw: { width: W, height: H, channels: 4 } }).png().toBuffer();
+}
+
+const brick = await rim(await readFile(join(PUB, 'brick.png')), 2);
+await writeFile(join(PUB, 'mark.png'), brick);
+done('mark.png');
 const { width, height } = await sharp(brick).metadata();
 
 await sharp(brick).resize(32, 32, { fit: 'inside', kernel: 'lanczos3' }).png().toFile(join(PUB, 'icon-32.png'));

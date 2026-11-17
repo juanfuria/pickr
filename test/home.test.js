@@ -157,8 +157,9 @@ test('the brick and the marks made from it are in place', async () => {
   assert.equal(Math.max(icon.width, icon.height), 32, 'the 32px icon fits a 32px square on its long side');
   const apple = await meta('apple-touch-icon.png');
   assert.deepEqual([apple.width, apple.height, apple.hasAlpha], [180, 180, false], 'the apple icon is a flat 180px square');
+  const mark = await meta('mark.png');
   const svg = await readFile(join(ROOT, 'public', 'icon.svg'), 'utf8');
-  assert.match(svg, new RegExp(`^<svg [^>]*viewBox="0 0 ${brick.width} ${brick.height}"`), 'the svg icon is the brick at its own size');
+  assert.match(svg, new RegExp(`^<svg [^>]*viewBox="0 0 ${mark.width} ${mark.height}"`), 'the svg icon is the mark at its own size');
   assert.ok(svg.includes('data:image/png;base64,'), 'with the brick inside it');
 });
 
@@ -201,9 +202,9 @@ test('the header is the brick in one column and the name and line in the other',
   const sharp = (await import('sharp')).default;
   const html = await readFile(join(ROOT, 'public', 'index.html'), 'utf8');
   const css = await readFile(join(ROOT, 'public', 'home.css'), 'utf8');
-  const brick = await sharp(join(ROOT, 'public', 'brick.png')).metadata();
+  const mark = await sharp(join(ROOT, 'public', 'mark.png')).metadata();
   const header = html.match(/<header class="intro">[\s\S]*?<\/header>/)[0];
-  assert.ok(header.includes(`<img class="brick" src="/_/brick.png" alt="" width="${brick.width}" height="${brick.height}">`), 'the brick, at its real size, decorative');
+  assert.ok(header.includes(`<img class="brick" src="/_/mark.png" alt="" width="${mark.width}" height="${mark.height}">`), 'the mark, at its real size, decorative');
   assert.match(header, /<div>\s*<h1>Pic<span class="k">k<\/span>r<\/h1>\s*<p>/, 'name over line, in their own column, the k in red');
   assert.match(css, /\.intro \.k \{ color: var\(--red\); \}/);
   assert.ok(header.includes(`<p>${LINE} The uploads are private; the <a href="https://github.com/juanfuria/pickr/blob/main/API.md">API</a> and the <a href="https://github.com/juanfuria/pickr">code</a> are public. Move something and watch the address change.</p>`), "the uploads line lives under the title now");
@@ -247,4 +248,20 @@ test('the page is set in Silkscreen, self-hosted, regular, at whole multiples of
   assert.match(css, /\.intro h1 \{[^}]*font: 400 48px\/1 var\(--mono\)/, 'the name, regular: Silkscreen looks awful bold');
   assert.doesNotMatch(css, /font-weight: (6|7)00/, 'nothing on the page is bold');
   assert.match(vhost, /font-src 'self'/, 'the policy lets the page load its own font');
+});
+
+test('the mark is the brick with a two-pixel white rim, and it is what the page shows', async () => {
+  const sharp = (await import('sharp')).default;
+  const brick = await sharp(join(ROOT, 'public', 'brick.png')).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const mark = await sharp(join(ROOT, 'public', 'mark.png')).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  assert.deepEqual([mark.info.width, mark.info.height], [brick.info.width + 4, brick.info.height + 4], 'two pixels all round');
+  const px = (img, x, y) => [...img.data.subarray((y * img.info.width + x) * 4, (y * img.info.width + x) * 4 + 4)];
+  const x = [...Array(brick.info.width).keys()].find((i) => px(brick, i, 0)[3] > 0); // where the brick touches its top edge
+  assert.deepEqual(px(mark, x + 2, 0), [255, 255, 255, 255], 'white two pixels above the brick');
+  assert.deepEqual(px(mark, x + 2, 1), [255, 255, 255, 255], 'white one pixel above the brick');
+  assert.deepEqual(px(mark, x + 2, 2), px(brick, x, 0), 'the brick itself, untouched');
+  const html = await readFile(join(ROOT, 'public', 'index.html'), 'utf8');
+  assert.ok(html.includes(`<img class="brick" src="/_/mark.png" alt="" width="${mark.info.width}" height="${mark.info.height}">`), 'the header shows the rimmed mark at its real size');
+  const card = await readFile(join(ROOT, 'art', 'card.html'), 'utf8');
+  assert.match(card, /src="\.\.\/public\/mark\.png"/, 'so does the card');
 });
