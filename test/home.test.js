@@ -169,16 +169,17 @@ test('the sharing card is 1200 by 630 and says what the page says', async () => 
   const { channels } = await sharp(join(ROOT, 'public', 'card.png')).stats();
   assert.ok(channels.some((c) => c.stdev > 20), 'not one flat colour');
   const html = await readFile(join(ROOT, 'art', 'card.html'), 'utf8');
-  assert.match(html, /<h1>Sen<\/h1>/);
+  assert.match(html, /<h1>Pic<span class="k">k<\/span>r<\/h1>/, 'the k in red, as pickr.me had it');
+  assert.match(html, /\.k \{ color: #ff6c52; \}/);
   assert.ok(html.includes(`<p>${LINE}</p>`), 'the card carries the line, verbatim');
   assert.doesNotMatch(html, /i\.juan\.is/, 'no address on the card');
 });
 
-test('the head names the page Sen and carries its marks and card', async () => {
+test('the head names the page Pickr and carries its marks and card', async () => {
   const sharp = (await import('sharp')).default;
   const html = await readFile(join(ROOT, 'public', 'index.html'), 'utf8');
   const head = html.slice(0, html.indexOf('</head>'));
-  assert.match(head, /<title>Sen<\/title>/);
+  assert.match(head, /<title>Pickr<\/title>/);
   assert.ok(head.includes(`<meta name="description" content="${LINE}">`));
   assert.match(head, /<meta name="theme-color" content="#f4f1e8" media="\(prefers-color-scheme: light\)">/);
   assert.match(head, /<meta name="theme-color" content="#0e1120" media="\(prefers-color-scheme: dark\)">/);
@@ -186,7 +187,7 @@ test('the head names the page Sen and carries its marks and card', async () => {
   assert.match(head, /<link rel="icon" href="\/_\/icon-32\.png" type="image\/png" sizes="32x32">/);
   assert.match(head, /<link rel="apple-touch-icon" href="\/_\/apple-touch-icon\.png">/);
   assert.match(head, /<link rel="canonical" href="https:\/\/i\.juan\.is\/">/);
-  for (const [p, v] of [['type', 'website'], ['title', 'Sen'], ['description', LINE], ['url', 'https://i.juan.is/'], ['image', 'https://i.juan.is/_/card.png'], ['image:width', '1200'], ['image:height', '630'], ['locale', 'en_GB']]) {
+  for (const [p, v] of [['type', 'website'], ['title', 'Pickr'], ['description', LINE], ['url', 'https://i.juan.is/'], ['image', 'https://i.juan.is/_/card.png'], ['image:width', '1200'], ['image:height', '630'], ['locale', 'en_GB']]) {
     assert.ok(head.includes(`<meta property="og:${p}" content="${v}">`), `og:${p}`);
   }
   assert.match(head, /<meta property="og:image:alt" content="[^"]+">/);
@@ -203,7 +204,8 @@ test('the header is the brick in one column and the name and line in the other',
   const brick = await sharp(join(ROOT, 'public', 'brick.png')).metadata();
   const header = html.match(/<header class="intro">[\s\S]*?<\/header>/)[0];
   assert.ok(header.includes(`<img class="brick" src="/_/brick.png" alt="" width="${brick.width}" height="${brick.height}">`), 'the brick, at its real size, decorative');
-  assert.match(header, /<div>\s*<h1>Sen<\/h1>\s*<p>/, 'name over line, in their own column');
+  assert.match(header, /<div>\s*<h1>Pic<span class="k">k<\/span>r<\/h1>\s*<p>/, 'name over line, in their own column, the k in red');
+  assert.match(css, /\.intro \.k \{ color: var\(--red\); \}/);
   assert.ok(header.includes(`<p>${LINE} The uploads are private; the <a href="https://github.com/juanfuria/pickr/blob/main/API.md">API</a> and the <a href="https://github.com/juanfuria/pickr">code</a> are public. Move something and watch the address change.</p>`), "the uploads line lives under the title now");
   assert.doesNotMatch(html, /<footer/, "and the footer that held it is gone");
   assert.doesNotMatch(header, /i\.juan\.is/, 'no address in the header');
