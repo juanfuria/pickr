@@ -40,26 +40,32 @@ a { color: var(--ink); }
   display: grid;
   gap: 20px;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-areas: "intro" "stage" "controls" "foot";
+  grid-template-areas: "side" "controls" "foot";
 }
 @media (min-width: 900px) {
   .page {
-    padding: 40px 24px 64px;
+    padding: 40px 24px 16px;
     column-gap: 28px;
     grid-template-columns: minmax(0, 1fr) 320px;
-    grid-template-areas: "intro intro" "stage controls" "foot foot";
+    grid-template-rows: auto 1fr;
+    grid-template-areas: "side controls" "side foot";
   }
-  .controls { position: sticky; top: 16px; align-self: start; }
-  .canvas { height: clamp(320px, 68vh, 760px); }
+  .controls { align-self: start; }
+  /* the left side (title, picture, facts) stays put while the controls scroll past it, when the window is tall enough to hold it */
+  @media (min-height: 600px) {
+    .side { position: sticky; top: 16px; align-self: start; height: calc(100vh - 32px); grid-template-rows: auto minmax(0, 1fr); }
+    .stage { grid-template-rows: auto minmax(0, 1fr) auto auto; }
+    .canvas { height: 100%; min-height: 240px; }
+  }
 }
 
-.intro { grid-area: intro; }
+.side { grid-area: side; display: grid; gap: 20px; align-content: start; }
 .intro h1 { margin: 0 0 6px; font: 700 clamp(28px, 4.5vw, 42px)/1.1 var(--mono); letter-spacing: -0.02em; color: var(--ink); }
 /* a red full stop (it began as the red egg in the first default picture) */
 .intro h1::after { content: ""; display: inline-block; width: 0.38em; height: 0.52em; margin-left: 0.12em; border-radius: 50%; background: var(--red); vertical-align: baseline; }
 .intro p { margin: 0; max-width: 62ch; color: var(--muted); }
 
-.stage { grid-area: stage; min-width: 0; display: grid; gap: 12px; align-content: start; }
+.stage { min-width: 0; display: grid; gap: 12px; align-content: start; }
 
 .address { display: flex; gap: 8px; align-items: center; padding: 6px 6px 6px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
 .url { flex: 1; min-width: 0; padding: 4px 0; font: 14px/1.6 var(--mono); color: var(--text); text-decoration: none; overflow-wrap: anywhere; }

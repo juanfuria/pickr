@@ -134,3 +134,15 @@ test('the shape and anchor controls are on the page, with the point placed by th
   for (const id of ['point', 'win', 'anchor-out', 'anchor-hint']) assert.ok(html.includes(`id="${id}"`), `#${id}`);
   assert.match(js, /from '\.\/window\.js'/, 'the page draws the window the server will cut');
 });
+
+test('on a wide screen the title, picture and facts stay put while the controls scroll', async () => {
+  const html = await readFile(join(ROOT, 'public', 'index.html'), 'utf8');
+  const css = await readFile(join(ROOT, 'public', 'home.css'), 'utf8');
+  assert.match(html, /<div class="side">\s*<header class="intro">[\s\S]*<section class="stage"[\s\S]*<\/section>\s*<\/div>\s*<form class="controls"/, 'title and stage share one column');
+  const start = css.indexOf('@media (min-width: 900px)');
+  assert.ok(start >= 0, 'there is a wide layout');
+  const wide = css.slice(start, css.indexOf('\n}\n', start));
+  assert.match(wide, /\.side \{[^}]*position: sticky/, "the left side sticks");
+  assert.match(wide, /grid-template-areas: "side controls" "side foot";/, "the foot sits under the controls, out of the way of the stuck column");
+  assert.doesNotMatch(wide, /\.controls \{[^}]*position: sticky/, 'the controls scroll with the page');
+});
