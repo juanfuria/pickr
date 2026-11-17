@@ -2,7 +2,7 @@
 
 An imgix-style file host for `i.juan.is`: originals served by nginx, images resized on demand and cached, video streamed, files served as themselves. Uploads through an API with per-account keys. Spec and decisions live in the pixelatedrobots folder (`docs/superpowers/specs/2026-10-28-pickr-design.md`).
 
-The page at the root calls itself **Pickr** too, with the k in red as pickr.me had it. Its icons and the sharing card come from `public/brick.png` by `npm run marks` (sharp, and Google Chrome for the card); commit what it writes.
+The page at the root calls itself **Pickr** too, with the k in red as pickr.me had it. It is set in [Silkscreen](https://github.com/googlefonts/silkscreen), the 8px pixel font of the 2004 skins, self-hosted as `public/silkscreen.woff2` under the OFL (`art/silkscreen-OFL.txt`), at whole multiples of eight and never bold. Its icons and the sharing card come from `public/brick.png` by `npm run marks` (sharp, and Google Chrome for the card); commit what it writes.
 
 ## Run locally
 

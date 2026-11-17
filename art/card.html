@@ -5,11 +5,12 @@
 <title>Pickr card</title>
 <!-- The sharing card, 1200 by 630, rendered to public/card.png by headless Chrome from art/make-marks.mjs. -->
 <style>
+@font-face { font-family: 'Silkscreen'; src: url('../public/silkscreen.woff2') format('woff2'); font-weight: 400; }
 html, body { margin: 0; }
-body { width: 1200px; height: 630px; box-sizing: border-box; padding: 0 100px; display: flex; align-items: center; gap: 80px; background: #0e1120; color: #e8e6f1; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+body { width: 1200px; height: 630px; box-sizing: border-box; padding: 0 100px; display: flex; align-items: center; gap: 80px; background: #0e1120; color: #e8e6f1; font-family: 'Silkscreen', system-ui, sans-serif; }
 img { height: 360px; width: auto; flex: none; image-rendering: pixelated; }
-h1 { margin: 0 0 26px; font: 700 140px/1 ui-monospace, "SF Mono", Menlo, Consolas, monospace; letter-spacing: -0.02em; }
-p { margin: 0; max-width: 560px; font-size: 32px; line-height: 1.35; color: #9b9db4; }
+h1 { margin: 0 0 32px; font: 400 112px/1 'Silkscreen', monospace; letter-spacing: 0; }
+p { margin: 0; max-width: 560px; font-size: 24px; line-height: 1.5; color: #9b9db4; }
 .k { color: #ff6c52; }
 </style>
 </head>

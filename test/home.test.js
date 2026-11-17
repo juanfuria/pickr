@@ -236,3 +236,15 @@ test('the page has a file field, and learns a picture\'s size from the render th
   assert.match(js, /known \?\? /, 'a render cached before the header falls back to the size the page knows, or to the original itself');
   assert.match(js, /`f=\$\{file\}`/, 'the hash names the file');
 });
+
+test('the page is set in Silkscreen, self-hosted, regular, at whole multiples of eight', async () => {
+  const css = await readFile(join(ROOT, 'public', 'home.css'), 'utf8');
+  const vhost = await readFile(join(ROOT, 'deploy', 'nginx', 'i.juan.is.conf'), 'utf8');
+  const font = await readFile(join(ROOT, 'public', 'silkscreen.woff2'));
+  assert.equal(font.subarray(0, 4).toString('latin1'), 'wOF2', 'a woff2 file');
+  assert.match(css, /@font-face \{ font-family: 'Silkscreen'; src: url\('\/_\/silkscreen\.woff2'\) format\('woff2'\); font-weight: 400; font-display: swap; \}/);
+  assert.match(css, /--mono: 'Silkscreen',/); assert.match(css, /--sans: 'Silkscreen',/);
+  assert.match(css, /\.intro h1 \{[^}]*font: 400 48px\/1 var\(--mono\)/, 'the name, regular: Silkscreen looks awful bold');
+  assert.doesNotMatch(css, /font-weight: (6|7)00/, 'nothing on the page is bold');
+  assert.match(vhost, /font-src 'self'/, 'the policy lets the page load its own font');
+});
