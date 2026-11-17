@@ -74,7 +74,7 @@ test('the home page loads only its own files and names a real demo image', async
   assert.match(html, /<script type="module" src="\/_\/home\.js"><\/script>/);
   assert.match(html, /<link rel="stylesheet" href="\/_\/home\.css">/);
   for (const [, attr, url] of html.matchAll(/\b(src|href)="([^"]*)"/g)) {
-    if (attr === 'href' && /^https:\/\/github\.com\//.test(url)) continue; // plain links out are fine
+    if (attr === 'href' && /^https:\/\/(github\.com\/|i\.juan\.is\/$)/.test(url)) continue; // links out, and the canonical
     assert.ok(url.startsWith('/') && !url.startsWith('//'), `${attr}="${url}" leaves the site`);
   }
   const file = html.match(/data-file="([^"]+)"/)[1];
@@ -170,4 +170,26 @@ test('the sharing card is 1200 by 630 and says what the page says', async () => 
   assert.match(html, /<h1>Sen<\/h1>/);
   assert.ok(html.includes(`<p>${LINE}</p>`), 'the card carries the line, verbatim');
   assert.doesNotMatch(html, /i\.juan\.is/, 'no address on the card');
+});
+
+test('the head names the page Sen and carries its marks and card', async () => {
+  const sharp = (await import('sharp')).default;
+  const html = await readFile(join(ROOT, 'public', 'index.html'), 'utf8');
+  const head = html.slice(0, html.indexOf('</head>'));
+  assert.match(head, /<title>Sen<\/title>/);
+  assert.ok(head.includes(`<meta name="description" content="${LINE}">`));
+  assert.match(head, /<meta name="theme-color" content="#f4f1e8" media="\(prefers-color-scheme: light\)">/);
+  assert.match(head, /<meta name="theme-color" content="#0e1120" media="\(prefers-color-scheme: dark\)">/);
+  assert.match(head, /<link rel="icon" href="\/_\/icon\.svg" type="image\/svg\+xml">/);
+  assert.match(head, /<link rel="icon" href="\/_\/icon-32\.png" type="image\/png" sizes="32x32">/);
+  assert.match(head, /<link rel="apple-touch-icon" href="\/_\/apple-touch-icon\.png">/);
+  assert.match(head, /<link rel="canonical" href="https:\/\/i\.juan\.is\/">/);
+  for (const [p, v] of [['type', 'website'], ['title', 'Sen'], ['description', LINE], ['url', 'https://i.juan.is/'], ['image', 'https://i.juan.is/_/card.png'], ['image:width', '1200'], ['image:height', '630'], ['locale', 'en_GB']]) {
+    assert.ok(head.includes(`<meta property="og:${p}" content="${v}">`), `og:${p}`);
+  }
+  assert.match(head, /<meta property="og:image:alt" content="[^"]+">/);
+  assert.match(head, /<meta name="twitter:card" content="summary_large_image">/);
+  assert.doesNotMatch(head, /<title>[^<]*i\.juan\.is/, 'no address in the title');
+  const card = await sharp(join(ROOT, 'public', 'card.png')).metadata();
+  assert.deepEqual([card.width, card.height], [1200, 630], 'the stated size is the real size');
 });
