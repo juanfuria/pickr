@@ -8,6 +8,7 @@ import { parseImageParams } from '../server/params.js';
 import { isValidId } from '../server/ids.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const LINE = 'A small file host. Give it a file and it comes back with a shorter name, and does as its address says.';
 
 test('the home page builds the shortest query that means the same thing', () => {
   assert.equal(buildQuery(DEFAULTS), '');
@@ -159,4 +160,14 @@ test('the brick and the marks made from it are in place', async () => {
   const svg = await readFile(join(ROOT, 'public', 'icon.svg'), 'utf8');
   assert.match(svg, new RegExp(`^<svg [^>]*viewBox="0 0 ${brick.width} ${brick.height}"`), 'the svg icon is the brick at its own size');
   assert.ok(svg.includes('data:image/png;base64,'), 'with the brick inside it');
+});
+
+test('the sharing card is 1200 by 630 and says what the page says', async () => {
+  const sharp = (await import('sharp')).default;
+  const card = await sharp(join(ROOT, 'public', 'card.png')).metadata();
+  assert.deepEqual([card.width, card.height], [1200, 630]);
+  const html = await readFile(join(ROOT, 'art', 'card.html'), 'utf8');
+  assert.match(html, /<h1>Sen<\/h1>/);
+  assert.ok(html.includes(`<p>${LINE}</p>`), 'the card carries the line, verbatim');
+  assert.doesNotMatch(html, /i\.juan\.is/, 'no address on the card');
 });
