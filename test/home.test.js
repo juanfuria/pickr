@@ -166,6 +166,8 @@ test('the sharing card is 1200 by 630 and says what the page says', async () => 
   const sharp = (await import('sharp')).default;
   const card = await sharp(join(ROOT, 'public', 'card.png')).metadata();
   assert.deepEqual([card.width, card.height], [1200, 630]);
+  const { channels } = await sharp(join(ROOT, 'public', 'card.png')).stats();
+  assert.ok(channels.some((c) => c.stdev > 20), 'not one flat colour');
   const html = await readFile(join(ROOT, 'art', 'card.html'), 'utf8');
   assert.match(html, /<h1>Sen<\/h1>/);
   assert.ok(html.includes(`<p>${LINE}</p>`), 'the card carries the line, verbatim');
