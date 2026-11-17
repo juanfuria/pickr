@@ -144,7 +144,7 @@ test('on a wide screen the title, picture and facts stay put while the controls 
   assert.ok(start >= 0, 'there is a wide layout');
   const wide = css.slice(start, css.indexOf('\n}\n', start));
   assert.match(wide, /\.side \{[^}]*position: sticky/, "the left side sticks");
-  assert.match(wide, /grid-template-areas: "side controls" "side foot";/, "the foot sits under the controls, out of the way of the stuck column");
+  assert.match(wide, /grid-template-areas: "side controls";/, "one row: the column and the controls, nothing under them");
   assert.doesNotMatch(wide, /\.controls \{[^}]*position: sticky/, 'the controls scroll with the page');
 });
 
@@ -204,7 +204,8 @@ test('the header is the brick in one column and the name and line in the other',
   const header = html.match(/<header class="intro">[\s\S]*?<\/header>/)[0];
   assert.ok(header.includes(`<img class="brick" src="/_/brick.png" alt="" width="${brick.width}" height="${brick.height}">`), 'the brick, at its real size, decorative');
   assert.match(header, /<div>\s*<h1>Sen<\/h1>\s*<p>/, 'name over line, in their own column');
-  assert.ok(header.includes(`<p>${LINE} Move something and watch the address change.</p>`));
+  assert.ok(header.includes(`<p>${LINE} The uploads are private; the <a href="https://github.com/juanfuria/pickr/blob/main/API.md">API</a> and the <a href="https://github.com/juanfuria/pickr">code</a> are public. Move something and watch the address change.</p>`), "the uploads line lives under the title now");
+  assert.doesNotMatch(html, /<footer/, "and the footer that held it is gone");
   assert.doesNotMatch(header, /i\.juan\.is/, 'no address in the header');
   assert.match(css, /\.intro \{[^}]*grid-template-columns: auto 1fr/);
   assert.match(css, /\.intro \.brick \{[^}]*height: 104px/);

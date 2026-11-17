@@ -40,15 +40,14 @@ a { color: var(--ink); }
   display: grid;
   gap: 20px;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-areas: "side" "controls" "foot";
+  grid-template-areas: "side" "controls";
 }
 @media (min-width: 900px) {
   .page {
     padding: 40px 24px 16px;
     column-gap: 28px;
     grid-template-columns: minmax(0, 1fr) 320px;
-    grid-template-rows: auto 1fr;
-    grid-template-areas: "side controls" "side foot";
+    grid-template-areas: "side controls";
   }
   .controls { align-self: start; }
   /* the left side (title, picture, facts) stays put while the controls scroll past it, when the window is tall enough to hold it */
@@ -158,9 +157,6 @@ fieldset:disabled .hint { opacity: 0.6; }
 .xywh input::-webkit-outer-spin-button, .xywh input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .hint a { color: inherit; }
 .reset { justify-self: start; }
-
-.foot { grid-area: foot; font-size: 14px; color: var(--muted); }
-.foot p { margin: 0; }
 
 @media (prefers-reduced-motion: reduce) {
   .url .tok.fresh { animation: none; }
