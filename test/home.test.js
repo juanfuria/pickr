@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildQuery, parseQuery, DEFAULTS } from '../public/url.js';
+import { buildQuery, parseQuery, parseAddress, DEFAULTS } from '../public/url.js';
 import { parseImageParams } from '../server/params.js';
 import { isValidId } from '../server/ids.js';
 
@@ -213,4 +213,26 @@ test('the header is the brick in one column and the name and line in the other',
   assert.match(css, /\.intro \.brick \{[^}]*height: 104px/);
   assert.match(css, /@media \(max-width: 559px\) \{[\s\S]*?\.intro \.brick \{[^}]*height: 72px/);
   assert.doesNotMatch(css, /h1::after/, 'the red egg is gone');
+});
+
+test('the file field takes an id, a path, a full address or a playground link, with any query along', () => {
+  assert.deepEqual(parseAddress('5za4iMSuGLWa.png'), { file: '5za4iMSuGLWa.png', query: '' });
+  assert.deepEqual(parseAddress(' /5za4iMSuGLWa.png?w=800 '), { file: '5za4iMSuGLWa.png', query: 'w=800' });
+  assert.deepEqual(parseAddress('https://i.juan.is/5za4iMSuGLWa.png?rect=265,0,750,550'), { file: '5za4iMSuGLWa.png', query: 'rect=265,0,750,550' });
+  assert.deepEqual(parseAddress('i.juan.is/pickr_d1a46ced.jpg?w=800&fm=webp'), { file: 'pickr_d1a46ced.jpg', query: 'w=800&fm=webp' });
+  assert.deepEqual(parseAddress('https://i.juan.is/#f=5za4iMSuGLWa.png&w=800'), { file: '5za4iMSuGLWa.png', query: 'w=800' });
+  assert.deepEqual(parseAddress('#f=5za4iMSuGLWa.png'), { file: '5za4iMSuGLWa.png', query: '' });
+  for (const bad of ['', '5za4iMSuGLWa', '_x.png', 'https://i.juan.is/', '#w=800', 'a b.png']) assert.equal(parseAddress(bad), null, `not a file: ${JSON.stringify(bad)}`);
+});
+
+test('the page has a file field, and learns a picture\'s size from the render that draws the minimap', async () => {
+  const html = await readFile(join(ROOT, 'public', 'index.html'), 'utf8');
+  const js = await readFile(join(ROOT, 'public', 'home.js'), 'utf8');
+  assert.match(html, /<input type="text" id="file" name="file"[^>]*>/);
+  assert.doesNotMatch(html, /<input type="text" id="file"[^>]*\svalue=/, 'the demo image is named once, in data-file');
+  for (const id of ['open', 'file-hint']) assert.ok(html.includes(`id="${id}"`), `#${id}`);
+  assert.match(js, /parseAddress/, 'the field is read with the shared grammar');
+  assert.match(js, /x-source-size/, 'the size comes from the render\'s header');
+  assert.match(js, /known \?\? /, 'a render cached before the header falls back to the size the page knows, or to the original itself');
+  assert.match(js, /`f=\$\{file\}`/, 'the hash names the file');
 });

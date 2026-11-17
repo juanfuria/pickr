@@ -26,6 +26,9 @@ test('nothing applies: a redirect to the original; variants when parameters appl
   assert.equal(small.headers['cache-control'], 'public, max-age=31536000, immutable');
   const m = await sharp(small.rawPayload).metadata();
   assert.deepEqual([m.width, m.height], [100, 133]);
+  const pm = await sharp(fixture('photo.jpg')).metadata();
+  const [sw, sh] = (pm.orientation ?? 1) >= 5 ? [pm.height, pm.width] : [pm.width, pm.height];
+  assert.equal(small.headers['x-source-size'], `${sw}x${sh}`, 'a render says how big the upright original is');
 
   const webp = await get(app, `/_render/${f.id}.jpg?w=50&fm=webp`);
   assert.equal(webp.headers['content-type'], 'image/webp');

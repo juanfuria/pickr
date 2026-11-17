@@ -137,6 +137,9 @@ fieldset:disabled .hint { opacity: 0.6; }
 .pills input:focus-visible + span { outline: 2px solid var(--red); outline-offset: 2px; }
 .pills input:not(:disabled):hover + span { border-color: var(--ink); }
 .hint { margin: 6px 0 0; font-size: 13px; color: var(--muted); }
+.filebox { display: flex; gap: 6px; margin-top: 4px; }
+.filebox input { flex: 1; min-width: 0; padding: 7px 10px; font: 13px/1.4 var(--mono); color: var(--text); background: var(--paper); border: 1px solid var(--line); border-radius: 7px; }
+.filebox input:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
 
 /* the minimap: the original, small, with the cut drawn over it; the box's shadow dims everything outside it */
 .minimap { position: relative; margin-top: 8px; overflow: hidden; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); cursor: crosshair; touch-action: none; user-select: none; -webkit-user-select: none; }

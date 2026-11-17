@@ -1,11 +1,14 @@
-import { DEFAULTS, buildQuery, parseQuery } from './url.js';
+import { DEFAULTS, buildQuery, parseQuery, parseAddress } from './url.js';
 import { defaultRect, clampRect, drawRect, moveRect, resizeRect, mapToSource } from './rect.js';
 import { windowFor } from './window.js';
 
 const $ = (id) => document.getElementById(id);
 const main = document.querySelector('main');
-const FILE = main.dataset.file;
-const ORIGINAL = { w: Number(main.dataset.width), h: Number(main.dataset.height) };
+const DEFAULT_FILE = main.dataset.file;
+let file = DEFAULT_FILE; // the picture on the page; the hash names it when it is not the default
+let mapUrl = null;
+const DEFAULT_SIZE = { w: Number(main.dataset.width), h: Number(main.dataset.height) };
+const ORIGINAL = { ...DEFAULT_SIZE };
 const FORMAT_EDGE = { avif: 1600, webp: 2560 };
 const DPRS = [1, 1.5, 2, 3];
 const FIT_HINTS = {
@@ -18,6 +21,7 @@ const TYPES = { 'image/jpeg': 'JPEG', 'image/webp': 'WebP', 'image/avif': 'AVIF'
 const form = $('controls');
 const canvas = $('canvas');
 const img = $('picture');
+const DEFAULT_ALT = img.alt;
 const minimap = $('minimap');
 const box = $('box');
 const ratio = (ar) => (ar ? ar.split(':').map(Number).reduce((a, b) => a / b) : null);
@@ -142,7 +146,7 @@ function paintAddress(query, before) {
   url.replaceChildren();
   const span = (cls, text) => Object.assign(document.createElement('span'), { className: cls, textContent: text });
   const path = span('path', '');
-  path.append(span('host', location.host), span('sep', '/'), span('file', FILE));
+  path.append(span('host', location.host), span('sep', '/'), span('file', file));
   url.append(path);
   // each parameter keeps its separator, so a narrow screen wraps between parameters, never inside one
   query.split('&').filter(Boolean).forEach((pair, i) => {
@@ -153,7 +157,8 @@ function paintAddress(query, before) {
   url.href = addressFor(query);
 }
 
-const pathFor = (query) => `/${FILE}${query ? `?${query}` : ''}`;
+const pathFor = (query) => `/${file}${query ? `?${query}` : ''}`;
+const hashFor = (query) => { const parts = [file !== DEFAULT_FILE ? `f=${file}` : '', query].filter(Boolean); return parts.length ? `#${parts.join('&')}` : location.pathname; };
 const addressFor = (query) => `${location.origin}${pathFor(query)}`;
 
 function update() {
@@ -162,7 +167,7 @@ function update() {
   const query = buildQuery(state);
   paintControls(state);
   if (query !== before) paintAddress(query, before);
-  history.replaceState(null, '', query ? `#${query}` : location.pathname);
+  history.replaceState(null, '', hashFor(query));
   clearTimeout(timer);
   timer = setTimeout(() => load(query), 200);
 }
@@ -328,7 +333,7 @@ for (const type of ['pointerup', 'pointercancel']) minimap.addEventListener(type
 form.addEventListener('input', update);
 form.addEventListener('change', update);
 form.addEventListener('submit', (e) => e.preventDefault());
-form.addEventListener('reset', () => setTimeout(update));
+form.addEventListener('reset', () => setTimeout(() => { $('file').value = file; update(); })); // the file stays, the parameters go
 
 $('view').addEventListener('click', () => {
   const actual = canvas.dataset.view !== 'actual';
@@ -348,13 +353,74 @@ $('copy').addEventListener('click', async () => {
   setTimeout(() => { $('copy').textContent = 'Copy'; }, 1600);
 });
 
-// The original's size makes the first render's "% of the original" possible, but never worth a stalled page.
-originalBytes = await Promise.race([
-  fetch(`/${FILE}`, { method: 'HEAD' }).then((r) => Number(r.headers.get('content-length')) || null).catch(() => null),
-  new Promise((resolve) => setTimeout(() => resolve(null), 1500)),
-]);
+// The original's size makes a render's "% of the original" possible, but never worth a stalled page.
+async function measureOriginal() {
+  originalBytes = await Promise.race([
+    fetch(`/${file}`, { method: 'HEAD' }).then((r) => Number(r.headers.get('content-length')) || null).catch(() => null),
+    new Promise((resolve) => setTimeout(() => resolve(null), 1500)),
+  ]);
+}
 
-$('map').src = `/${FILE}?w=480`;
+// The little picture for the minimap, and with it the original's upright size, which a render says in a header.
+// A render that is the original itself (a picture too small to shrink) says nothing, and nor does one cached
+// before the header existed: then the size the page already knows serves, or the original is measured itself.
+async function loadMap(name, known = null) {
+  const res = await fetch(`/${name}?w=480`);
+  if (!res.ok) throw new Error(res.status === 404 ? 'No file with that name on this host.' : `That didn't work: ${res.status}`);
+  const blob = await res.blob();
+  if (!blob.type.startsWith('image/')) throw new Error('That is a file here, but not a picture.');
+  const said = /^(\d+)x(\d+)$/.exec(res.headers.get('x-source-size') ?? '');
+  const size = said ? { w: Number(said[1]), h: Number(said[2]) }
+    : known ?? await createImageBitmap(res.redirected ? blob : await (await fetch(`/${name}`)).blob()).then((b) => ({ w: b.width, h: b.height }));
+  const next = URL.createObjectURL(blob);
+  if (mapUrl) URL.revokeObjectURL(mapUrl);
+  mapUrl = next;
+  $('map').src = next;
+  return size;
+}
+
+// Another picture on this host, from the file field: an id, or an address that may bring parameters of its own.
+async function openFile(text) {
+  const hint = $('file-hint');
+  const parsed = parseAddress(text);
+  if (!parsed) { hint.textContent = 'An id with its extension, like 5za4iMSuGLWa.png, or an address on this host.'; return; }
+  hint.textContent = 'Looking…';
+  try {
+    const size = await loadMap(parsed.file, parsed.file === DEFAULT_FILE ? { ...DEFAULT_SIZE } : null);
+    file = parsed.file;
+    Object.assign(ORIGINAL, size);
+    $('file').value = file;
+    img.alt = file === DEFAULT_FILE ? DEFAULT_ALT : 'The picture, as the address asks for it';
+    hint.textContent = `${size.w} × ${size.h} px`;
+    originalBytes = null;
+    measureOriginal();
+    if (parsed.query) writeForm(parseQuery(parsed.query));
+    shownQuery = null;
+    state = { ...state, w: -1 }; // force a paint of the address and a fresh render
+    update();
+  } catch (err) {
+    hint.textContent = err.message;
+  }
+}
+
+$('open').addEventListener('click', () => openFile($('file').value));
+$('file').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); openFile($('file').value); } });
+
+// The hash may name the file (#f=id.ext&…). The default's size is on the page; another's comes with its map.
+const named = location.hash.includes('f=') ? parseAddress(location.hash) : null;
+if (named && named.file !== DEFAULT_FILE) {
+  try {
+    Object.assign(ORIGINAL, await loadMap(named.file));
+    file = named.file;
+    img.alt = 'The picture, as the address asks for it';
+  } catch (err) {
+    $('file-hint').textContent = `${err.message} This is the default instead.`;
+  }
+} else {
+  loadMap(file, { ...DEFAULT_SIZE }).then((size) => Object.assign(ORIGINAL, size)).catch(() => { $('map').src = `/${file}?w=480`; });
+}
+$('file').value = file;
+await measureOriginal();
 if (location.hash.length > 1) writeForm(parseQuery(location.hash));
 state = { ...DEFAULTS, w: -1 }; // force the first paint
 update();

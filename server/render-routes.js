@@ -62,7 +62,7 @@ export default async function renderRoutes(app, { db, root, renderLimiter = crea
       let out;
       try { out = await limited(req, () => renderImage(src, ip)); } catch (e) { throw renderError(e, 'cannot render this image'); }
       stillLive();
-      return reply.type(out.mime).send(out.body);
+      return reply.header('X-Source-Size', `${out.source.width}x${out.source.height}`).type(out.mime).send(out.body);
     }
 
     if (row.kind === 'video') {
@@ -80,7 +80,7 @@ export default async function renderRoutes(app, { db, root, renderLimiter = crea
       let out;
       try { out = await limited(req, () => renderImage(jpeg, ip)); } catch (e) { throw renderError(e, 'cannot render this frame'); }
       stillLive();
-      return reply.type(out.mime).send(out.body);
+      return reply.header('X-Source-Size', `${out.source.width}x${out.source.height}`).type(out.mime).send(out.body);
     }
 
     return original();

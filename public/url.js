@@ -78,3 +78,22 @@ export function parseQuery(text) {
     fp,
   };
 }
+
+// A file on this host as the file field takes it: "id.ext", "/id.ext?w=800", a full address, or a playground link
+// with #f=. Gives the file and whatever query came with it, or null when there is no file in the text.
+const fileName = (s) => (/^[A-Za-z0-9][A-Za-z0-9_]*\.[a-z0-9]+$/.test(s ?? '') ? s : null);
+export function parseAddress(text) {
+  const s = String(text ?? '').trim();
+  if (!s) return null;
+  const [front, hash = ''] = s.split('#');
+  const h = new URLSearchParams(hash);
+  if (h.has('f')) {
+    const file = fileName(h.get('f'));
+    if (!file) return null;
+    h.delete('f');
+    return { file, query: decodeURIComponent(h.toString()) };
+  }
+  const [path, query = ''] = front.split('?');
+  const file = fileName(path.slice(path.lastIndexOf('/') + 1));
+  return file ? { file, query } : null;
+}

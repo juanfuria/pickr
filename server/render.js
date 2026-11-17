@@ -154,7 +154,8 @@ export async function renderImage(input, p, { maxEdge = MAX_EDGE, maxFramePixels
   const options = fmt === 'avif' ? { quality: p.q, effort: 2 } : QUALITY.has(fmt) ? { quality: p.q } : {};
   img = img.toFormat(fmt, options);
   const body = await img.toBuffer();
-  return { body, mime: MIME[fmt] };
+  const [sw, sh] = upright(meta);
+  return { body, mime: MIME[fmt], source: { width: sw, height: sh } }; // the source: the upright original, or the frame
 }
 
 export async function posterFrame(path, t) {

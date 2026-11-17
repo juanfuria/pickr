@@ -64,6 +64,14 @@
 
   <form class="controls" id="controls" aria-label="Parameters">
     <div class="control">
+      <div class="row"><label for="file">File</label></div>
+      <div class="filebox">
+        <input type="text" id="file" name="file" placeholder="5za4iMSuGLWa.png, or an address here" spellcheck="false" autocomplete="off" aria-label="A file on this host">
+        <button type="button" id="open" class="button">Open</button>
+      </div>
+      <p class="hint" id="file-hint">Any picture on this host: an id with its extension, or a pasted address, whose parameters come along.</p>
+    </div>
+    <div class="control">
       <div class="row">
         <label class="check"><input type="checkbox" id="w-on" name="w-on" checked> Width</label>
         <code class="param">w</code>
